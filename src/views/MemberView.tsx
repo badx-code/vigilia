@@ -234,9 +234,6 @@ export const MemberView: React.FC<{
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-lg bg-[#14171C] border border-[#292E36] text-[11px] font-mono text-[#9FA4AD]">
-                Código: <strong className="text-[#C9B27C]">{config.memberCode || config.accessCode}</strong>
-              </span>
               {onLogout && (
                 <button
                   onClick={onLogout}

@@ -146,10 +146,10 @@ interface VigiliaContextType {
   // User Role & Multi-Profile Security
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
-  loginWithCode: (code: string) => { success: boolean; role?: UserRole; message: string };
+  loginWithCode: (code: string, expectedRole?: UserRole) => { success: boolean; role?: UserRole; message: string };
   logoutRole: () => void;
   regenerateCode: (type: 'membro' | 'dirigente' | 'admin') => string;
-  updateCustomCode: (type: 'membro' | 'dirigente' | 'admin', newCode: string) => boolean;
+  updateCustomCode: (type: 'membro' | 'dirigente' | 'admin', newCode: string) => { success: boolean; message?: string };
 
   // Multi-Vigil, Templates & History
   allVigils: VigilItem[];
@@ -423,45 +423,72 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   }, [allVigils]);
 
-  // Code Login / Role Verification
+  // Code Login / Role Verification (Strict exact match, no wildcards)
   const loginWithCode = useCallback(
-    (codeToTest: string): { success: boolean; role?: UserRole; message: string } => {
+    (codeToTest: string, expectedRole?: UserRole): { success: boolean; role?: UserRole; message: string } => {
       const clean = codeToTest.trim().toUpperCase();
       if (!clean) {
-        return { success: false, message: 'Digite um código válido.' };
+        return { success: false, message: 'Digite um código de acesso válido.' };
       }
 
-      // Check across all vigils or the active one
+      // Check across all registered vigils
       for (const v of allVigils) {
-        const memCode = (v.config.memberCode || v.config.accessCode || '').toUpperCase();
+        const memCode = (v.config.memberCode || v.config.accessCode || v.code || '').toUpperCase();
         const dirCode = (v.config.dirigenteCode || '').toUpperCase();
         const admCode = (v.config.adminCode || '').toUpperCase();
         const pin = (v.config.dirigentePin || '').toUpperCase();
 
-        if (clean === dirCode || clean === admCode || clean === pin || clean.startsWith('DIR-') || clean.startsWith('ADMIN-')) {
-          setActiveVigilId(v.id);
-          setUserRole('dirigente');
-          return { success: true, role: 'dirigente', message: 'Acesso de Dirigente confirmado!' };
+        // If user is trying to login as Dirigente
+        if (expectedRole === 'dirigente') {
+          if (clean === dirCode || clean === admCode || (pin && clean === pin)) {
+            setActiveVigilId(v.id);
+            setUserRole('dirigente');
+            return { success: true, role: 'dirigente', message: 'Acesso de Dirigente confirmado!' };
+          }
+          if (clean === memCode) {
+            return {
+              success: false,
+              message: 'Este é o código público de Membros. Para acessar o painel de liderança, insira o código do Dirigente.',
+            };
+          }
         }
 
-        if (clean === memCode || clean.startsWith('VIG-') || clean === v.code.toUpperCase()) {
-          setActiveVigilId(v.id);
-          setUserRole('membro');
-          return { success: true, role: 'membro', message: 'Bem-vindo à Vigília!' };
+        // If user is trying to login as Membro (public)
+        if (expectedRole === 'membro') {
+          if (clean === memCode) {
+            setActiveVigilId(v.id);
+            setUserRole('membro');
+            return { success: true, role: 'membro', message: 'Bem-vindo à Vigília!' };
+          }
+          if (clean === dirCode || clean === admCode) {
+            // If they entered dirigente code in member field, grant member view for that vigil
+            setActiveVigilId(v.id);
+            setUserRole('membro');
+            return { success: true, role: 'membro', message: 'Bem-vindo à Vigília!' };
+          }
+        }
+
+        // Unspecified role context (generic entry)
+        if (!expectedRole) {
+          if (clean === dirCode || clean === admCode || (pin && clean === pin)) {
+            setActiveVigilId(v.id);
+            setUserRole('dirigente');
+            return { success: true, role: 'dirigente', message: 'Acesso de Dirigente confirmado!' };
+          }
+          if (clean === memCode) {
+            setActiveVigilId(v.id);
+            setUserRole('membro');
+            return { success: true, role: 'membro', message: 'Bem-vindo à Vigília!' };
+          }
         }
       }
 
-      // Fallback matching prefix
-      if (clean.startsWith('DIR-') || clean.startsWith('ADMIN-')) {
-        setUserRole('dirigente');
-        return { success: true, role: 'dirigente', message: 'Acesso de Dirigente concedido.' };
-      }
-      if (clean.startsWith('VIG-')) {
-        setUserRole('membro');
-        return { success: true, role: 'membro', message: 'Acesso de Membro concedido.' };
-      }
-
-      return { success: false, message: 'Código não encontrado. Verifique se digitou corretamente.' };
+      return {
+        success: false,
+        message: expectedRole === 'dirigente'
+          ? 'Código de liderança não encontrado ou inválido.'
+          : 'Código da vigília não encontrado. Verifique os caracteres e tente novamente.',
+      };
     },
     [allVigils]
   );
@@ -488,7 +515,11 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let generated = '';
       if (type === 'membro') {
         generated = `VIG-${num}`;
-        updateConfig({ memberCode: generated, accessCode: generated });
+        updateActiveVigil((prev) => ({
+          ...prev,
+          code: generated,
+          config: { ...prev.config, memberCode: generated, accessCode: generated },
+        }));
       } else if (type === 'dirigente') {
         generated = `DIR-${num}`;
         updateConfig({ dirigenteCode: generated });
@@ -498,23 +529,69 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return generated;
     },
-    [updateConfig]
+    [updateConfig, updateActiveVigil]
   );
 
   const updateCustomCode = useCallback(
-    (type: 'membro' | 'dirigente' | 'admin', newCode: string): boolean => {
+    (type: 'membro' | 'dirigente' | 'admin', newCode: string): { success: boolean; message?: string } => {
       const clean = newCode.trim().toUpperCase();
-      if (!clean) return false;
+
+      // Basic validation
+      if (!clean) {
+        return { success: false, message: 'O código não pode ficar em branco.' };
+      }
+
+      if (clean.length < 3) {
+        return { success: false, message: 'O código deve conter no mínimo 3 caracteres.' };
+      }
+
+      if (clean.length > 25) {
+        return { success: false, message: 'O código deve conter no máximo 25 caracteres.' };
+      }
+
+      // Allowed characters: A-Z, 0-9, hyphens and underscores
+      const validPattern = /^[A-Z0-9_-]+$/;
+      if (!validPattern.test(clean)) {
+        return { success: false, message: 'Use apenas letras, números, hífen (-) ou sublinhado (_).' };
+      }
+
+      // Check conflict with other role of the same vigil
+      const currentDirCode = (config.dirigenteCode || '').toUpperCase();
+      const currentMemCode = (config.memberCode || config.accessCode || '').toUpperCase();
+
+      if (type === 'dirigente' && clean === currentMemCode) {
+        return {
+          success: false,
+          message: 'O código do dirigente não pode ser idêntico ao código público dos membros.',
+        };
+      }
+
+      if (type === 'membro' && clean === currentDirCode) {
+        return {
+          success: false,
+          message: 'O código do membro não pode ser idêntico ao código privado do dirigente.',
+        };
+      }
+
       if (type === 'membro') {
-        updateConfig({ memberCode: clean, accessCode: clean });
+        updateActiveVigil((prev) => ({
+          ...prev,
+          code: clean,
+          config: {
+            ...prev.config,
+            memberCode: clean,
+            accessCode: clean,
+          },
+        }));
       } else if (type === 'dirigente') {
         updateConfig({ dirigenteCode: clean });
       } else {
         updateConfig({ adminCode: clean });
       }
-      return true;
+
+      return { success: true, message: 'Código atualizado com sucesso!' };
     },
-    [updateConfig]
+    [config, updateConfig, updateActiveVigil]
   );
 
   // Delay & Schedule Recalculation

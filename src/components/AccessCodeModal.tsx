@@ -97,49 +97,11 @@ export const AccessCodeModal: React.FC<{
           </button>
         </form>
 
-        {/* Quick Access By Level */}
-        <div className="pt-2 border-t border-[#292E36] space-y-2">
-          <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
-            Níveis de Acesso:
-          </span>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              onClick={() => handleQuickRole('membro')}
-              className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
-                userRole === 'membro'
-                  ? 'bg-[#C9B27C]/15 border-[#C9B27C]/50'
-                  : 'bg-[#0B0D10] border-[#292E36] hover:border-[#C9B27C]/30'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-[#F2F2F2]">👥 Membro</span>
-                <User className="w-4 h-4 text-[#C9B27C]" />
-              </div>
-              <span className="text-[10px] text-[#9FA4AD] line-clamp-1">Acompanhamento público</span>
-              <span className="text-[11px] font-mono font-bold text-[#C9B27C] mt-2 block">
-                {config.memberCode || config.accessCode}
-              </span>
-            </button>
-
-            <button
-              onClick={() => handleQuickRole('dirigente')}
-              className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
-                userRole === 'dirigente'
-                  ? 'bg-[#C9B27C]/15 border-[#C9B27C]/50'
-                  : 'bg-[#0B0D10] border-[#292E36] hover:border-[#C9B27C]/30'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-[#C9B27C]">👑 Dirigente</span>
-                <Shield className="w-4 h-4 text-[#C9B27C]" />
-              </div>
-              <span className="text-[10px] text-[#9FA4AD] line-clamp-1">Painel da liderança</span>
-              <span className="text-[11px] font-mono font-bold text-[#C9B27C] mt-2 block">
-                {config.dirigenteCode || 'DIR-7391'}
-              </span>
-            </button>
-          </div>
+        {/* Info Note */}
+        <div className="pt-2 border-t border-[#292E36] text-center">
+          <p className="text-[11px] text-[#9FA4AD]">
+            Insira o código correspondente para desbloquear o modo Membro ou Dirigente.
+          </p>
         </div>
       </div>
     </div>

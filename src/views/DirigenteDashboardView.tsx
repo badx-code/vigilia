@@ -43,6 +43,9 @@ import {
   Megaphone,
   HelpCircle,
   MoreVertical,
+  Lock,
+  Link2,
+  AlertCircle,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useVigilia } from '../context/VigiliaContext';
@@ -104,6 +107,7 @@ export const DirigenteDashboardView: React.FC<{
     rejectPrayerRequest,
     exportDataJSON,
     importDataJSON,
+    updateCustomCode,
   } = useVigilia();
 
   const [activeTab, setActiveTab] = useState<'cronograma' | 'repertorio' | 'equipe' | 'pulpito' | 'configuracoes'>('cronograma');
@@ -118,6 +122,80 @@ export const DirigenteDashboardView: React.FC<{
 
   // QR Code Fullscreen Modal
   const [showQrModal, setShowQrModal] = useState(false);
+
+  // Edit Access Code Modal & Confirmation States
+  const [showEditCodeModal, setShowEditCodeModal] = useState(false);
+  const [editingCodeType, setEditingCodeType] = useState<'dirigente' | 'membro' | null>(null);
+  const [newCustomCodeInput, setNewCustomCodeInput] = useState('');
+  const [editCodeStep, setEditCodeStep] = useState<'input' | 'confirm'>('input');
+  const [editCodeError, setEditCodeError] = useState('');
+  const [editCodeSuccess, setEditCodeSuccess] = useState('');
+
+  const handleOpenEditCode = (type: 'dirigente' | 'membro') => {
+    setEditingCodeType(type);
+    setNewCustomCodeInput(
+      type === 'dirigente'
+        ? (config.dirigenteCode || 'DIR-7391')
+        : (config.memberCode || config.accessCode || 'VIG-4827')
+    );
+    setEditCodeStep('input');
+    setEditCodeError('');
+    setEditCodeSuccess('');
+    setShowEditCodeModal(true);
+  };
+
+  const handleProceedToConfirmCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditCodeError('');
+    const clean = newCustomCodeInput.trim().toUpperCase();
+
+    if (!clean) {
+      setEditCodeError('O código não pode ficar em branco.');
+      return;
+    }
+    if (clean.length < 3) {
+      setEditCodeError('O código deve conter no mínimo 3 caracteres.');
+      return;
+    }
+    if (clean.length > 25) {
+      setEditCodeError('O código deve conter no máximo 25 caracteres.');
+      return;
+    }
+    if (!/^[A-Z0-9_-]+$/.test(clean)) {
+      setEditCodeError('Use apenas letras, números, hífen (-) ou sublinhado (_).');
+      return;
+    }
+
+    const currentDirCode = (config.dirigenteCode || '').toUpperCase();
+    const currentMemCode = (config.memberCode || config.accessCode || '').toUpperCase();
+
+    if (editingCodeType === 'dirigente' && clean === currentMemCode) {
+      setEditCodeError('O código do dirigente não pode ser idêntico ao código público dos membros.');
+      return;
+    }
+    if (editingCodeType === 'membro' && clean === currentDirCode) {
+      setEditCodeError('O código do membro não pode ser idêntico ao código privado do dirigente.');
+      return;
+    }
+
+    setEditCodeStep('confirm');
+  };
+
+  const handleExecuteSaveNewCode = () => {
+    if (!editingCodeType) return;
+    const res = updateCustomCode(editingCodeType, newCustomCodeInput);
+    if (res.success) {
+      setEditCodeSuccess(res.message || 'Código alterado com sucesso!');
+      setTimeout(() => {
+        setShowEditCodeModal(false);
+        setEditCodeSuccess('');
+        setEditCodeStep('input');
+      }, 1200);
+    } else {
+      setEditCodeError(res.message || 'Erro ao alterar o código.');
+      setEditCodeStep('input');
+    }
+  };
 
   // Moment Add/Edit Modal
   const [showMomentModal, setShowMomentModal] = useState(false);
@@ -1026,80 +1104,123 @@ export const DirigenteDashboardView: React.FC<{
             {/* TAB: CONFIGURAÇÕES & QR CODE */}
             {activeTab === 'configuracoes' && (
               <div className="space-y-6 animate-fadeIn">
-                {/* Access Codes & Sharing Box */}
+                {/* 🔐 CÓDIGOS DE ACESSO & COMPARTILHAMENTO */}
                 <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 sm:p-6 space-y-5 shadow-xl">
                   <div>
-                    <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
-                      <QrCode className="w-4 h-4 text-[#C9B27C]" />
-                      <span>👥 ACESSO DOS MEMBROS & COMPARTILHAMENTO</span>
+                    <h2 className="text-base sm:text-lg font-bold text-[#F2F2F2] flex items-center gap-2 font-serif">
+                      <Lock className="w-5 h-5 text-[#C9B27C]" />
+                      <span>🔐 CÓDIGOS DE ACESSO & COMPARTILHAMENTO</span>
                     </h2>
-                    <p className="text-xs text-[#9FA4AD]">Divulgue o código para a igreja acompanhar a vigília pelo celular</p>
+                    <p className="text-xs text-[#9FA4AD] mt-0.5">
+                      Gerencie com segurança os códigos de acesso e os links de compartilhamento da vigília.
+                    </p>
                   </div>
 
                   {/* Codes Display Box */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-[#0B0D10] p-4 rounded-2xl border border-[#292E36] space-y-2">
-                      <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
-                        Código do Membro:
-                      </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 🔐 Código do Dirigente */}
+                    <div className="bg-[#0B0D10] p-4 sm:p-5 rounded-2xl border border-[#292E36] flex flex-col justify-between space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-xl font-extrabold text-[#C9B27C]">
-                          {config.memberCode || config.accessCode}
+                        <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-[#C9B27C]" />
+                          <span>🔐 Código do Dirigente</span>
                         </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 font-semibold">
+                          Privado
+                        </span>
+                      </div>
+
+                      <div className="py-1">
+                        <span className="font-mono text-xl sm:text-2xl font-black text-[#F2F2F2] tracking-wider">
+                          {config.dirigenteCode || 'DIR-7391'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-[#292E36]">
                         <button
-                          onClick={() => copyToClipboard(config.memberCode || config.accessCode, 'memberCode')}
-                          className="px-3 py-1.5 rounded-lg bg-[#14171C] hover:bg-[#191D24] text-xs font-semibold text-[#F2F2F2] border border-[#292E36] flex items-center gap-1.5 transition"
+                          onClick={() => copyToClipboard(config.dirigenteCode || 'DIR-7391', 'dirigenteCode')}
+                          className="flex-1 py-2 px-3 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-xs font-semibold text-[#F2F2F2] border border-[#292E36] flex items-center justify-center gap-1.5 transition cursor-pointer"
                         >
-                          {copiedKey === 'memberCode' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedKey === 'memberCode' ? 'Copiado!' : 'Copiar'}</span>
+                          {copiedKey === 'dirigenteCode' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[#C9B27C]" />}
+                          <span>{copiedKey === 'dirigenteCode' ? 'Copiado!' : 'Copiar'}</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditCode('dirigente')}
+                          className="py-2 px-3.5 rounded-xl bg-[#C9B27C]/15 hover:bg-[#C9B27C]/25 text-xs font-bold text-[#C9B27C] border border-[#C9B27C]/40 flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>✏️ Editar Código</span>
                         </button>
                       </div>
                     </div>
 
-                    <div className="bg-[#0B0D10] p-4 rounded-2xl border border-[#292E36] space-y-2">
-                      <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
-                        Código do Dirigente:
-                      </span>
+                    {/* 👥 Código dos Membros */}
+                    <div className="bg-[#0B0D10] p-4 sm:p-5 rounded-2xl border border-[#292E36] flex flex-col justify-between space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-xl font-extrabold text-[#F2F2F2]">
-                          {config.dirigenteCode || 'DIR-7391'}
+                        <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-[#C9B27C]" />
+                          <span>👥 Código dos Membros</span>
                         </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-semibold">
+                          Público
+                        </span>
+                      </div>
+
+                      <div className="py-1">
+                        <span className="font-mono text-xl sm:text-2xl font-black text-[#C9B27C] tracking-wider">
+                          {config.memberCode || config.accessCode}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-[#292E36]">
                         <button
-                          onClick={() => copyToClipboard(config.dirigenteCode || 'DIR-7391', 'dirigenteCode')}
-                          className="px-3 py-1.5 rounded-lg bg-[#14171C] hover:bg-[#191D24] text-xs font-semibold text-[#F2F2F2] border border-[#292E36] flex items-center gap-1.5 transition"
+                          onClick={() => copyToClipboard(config.memberCode || config.accessCode, 'memberCode')}
+                          className="flex-1 py-2 px-3 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-xs font-semibold text-[#F2F2F2] border border-[#292E36] flex items-center justify-center gap-1.5 transition cursor-pointer"
                         >
-                          {copiedKey === 'dirigenteCode' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedKey === 'dirigenteCode' ? 'Copiado!' : 'Copiar'}</span>
+                          {copiedKey === 'memberCode' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[#C9B27C]" />}
+                          <span>{copiedKey === 'memberCode' ? 'Copiado!' : 'Copiar'}</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditCode('membro')}
+                          className="py-2 px-3.5 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-xs font-bold text-[#F2F2F2] border border-[#292E36] flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-[#9FA4AD]" />
+                          <span>✏️ Editar Código</span>
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {/* Share Action Buttons */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#292E36]">
-                    <button
-                      onClick={handleWhatsAppShare}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-2 transition"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      <span>Compartilhar no WhatsApp</span>
-                    </button>
+                  <div className="space-y-2 pt-2 border-t border-[#292E36]">
+                    <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
+                      Compartilhamento da Vigília:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => copyToClipboard(memberLink, 'link')}
+                        className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <Link2 className="w-4 h-4 text-[#C9B27C]" />
+                        <span>{copiedKey === 'link' ? 'Link Copiado!' : '🔗 Copiar Link Público'}</span>
+                      </button>
 
-                    <button
-                      onClick={() => setShowQrModal(true)}
-                      className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#C9B27C] border border-[#C9B27C]/40 text-xs font-bold flex items-center gap-2 transition"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      <span>Gerar QR Code na Tela</span>
-                    </button>
+                      <button
+                        onClick={handleWhatsAppShare}
+                        className="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        <span>📱 Compartilhar</span>
+                      </button>
 
-                    <button
-                      onClick={() => copyToClipboard(memberLink, 'link')}
-                      className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center gap-2 transition"
-                    >
-                      <Copy className="w-4 h-4 text-[#9FA4AD]" />
-                      <span>{copiedKey === 'link' ? 'Link Copiado!' : 'Copiar Link Direto'}</span>
-                    </button>
+                      <button
+                        onClick={() => setShowQrModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#C9B27C] border border-[#C9B27C]/40 text-xs font-bold flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        <span>📷 Gerar QR Code</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1721,6 +1842,153 @@ export const DirigenteDashboardView: React.FC<{
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ===================== EDIT ACCESS CODE MODAL & CONFIRMATION ===================== */}
+      {showEditCodeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-md">
+          <div className="max-w-md w-full rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-5 shadow-2xl animate-scaleUp">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#C9B27C]/15 text-[#C9B27C] flex items-center justify-center">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#F2F2F2]">
+                    {editingCodeType === 'dirigente' ? 'Alterar Código do Dirigente' : 'Alterar Código dos Membros'}
+                  </h3>
+                  <span className="text-[11px] text-[#9FA4AD]">
+                    {editingCodeType === 'dirigente' ? 'Acesso privado da liderança' : 'Acesso público da congregação'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditCodeModal(false);
+                  setEditCodeStep('input');
+                  setEditCodeError('');
+                }}
+                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-semibold p-1"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {/* STEP 1: INPUT NEW CODE */}
+            {editCodeStep === 'input' && (
+              <form onSubmit={handleProceedToConfirmCode} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-[#F2F2F2] block mb-1">
+                    Novo Código de Acesso:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={newCustomCodeInput}
+                    onChange={(e) => setNewCustomCodeInput(e.target.value.toUpperCase())}
+                    placeholder={editingCodeType === 'dirigente' ? 'Ex: VIGILIA2026' : 'Ex: VIG-7391'}
+                    className="w-full px-4 py-3 rounded-xl bg-[#0B0D10] border border-[#292E36] text-base font-mono font-bold text-[#C9B27C] focus:outline-none focus:border-[#C9B27C] uppercase transition tracking-wider"
+                  />
+                  <p className="text-[11px] text-[#9FA4AD] mt-1.5 leading-relaxed">
+                    Você pode usar qualquer formato de texto e números (ex: <strong>VIGILIA2026</strong>, <strong>DIR-4827</strong>, <strong>MAD-2026</strong>). Mínimo de 3 caracteres.
+                  </p>
+                </div>
+
+                {editCodeError && (
+                  <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{editCodeError}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditCodeModal(false);
+                      setEditCodeError('');
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-[#0B0D10] text-[#9FA4AD] text-xs font-semibold hover:text-[#F2F2F2] transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold shadow-lg transition"
+                  >
+                    Continuar
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 2: CONFIRMATION DIALOG */}
+            {editCodeStep === 'confirm' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-amber-200 text-xs space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-amber-300">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Tem certeza que deseja alterar o código de acesso?</span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                    Depois da alteração, o código antigo deixará de funcionar imediatamente para todos os usuários.
+                  </p>
+                </div>
+
+                {/* Diff summary box */}
+                <div className="bg-[#0B0D10] p-3.5 rounded-xl border border-[#292E36] space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#9FA4AD]">Código Atual:</span>
+                    <span className="font-mono font-bold text-[#F2F2F2]">
+                      {editingCodeType === 'dirigente' ? (config.dirigenteCode || 'DIR-7391') : (config.memberCode || config.accessCode)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-[#292E36] pt-2">
+                    <span className="text-[#9FA4AD]">Novo Código:</span>
+                    <span className="font-mono font-bold text-[#C9B27C] text-sm">
+                      {newCustomCodeInput.trim().toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                {editCodeError && (
+                  <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{editCodeError}</span>
+                  </div>
+                )}
+
+                {editCodeSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>{editCodeSuccess}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
+                  <button
+                    type="button"
+                    disabled={!!editCodeSuccess}
+                    onClick={() => setEditCodeStep('input')}
+                    className="px-4 py-2.5 rounded-xl bg-[#0B0D10] text-[#9FA4AD] text-xs font-semibold hover:text-[#F2F2F2] transition disabled:opacity-50"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!editCodeSuccess}
+                    onClick={handleExecuteSaveNewCode}
+                    className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold shadow-lg transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Salvar Novo Código</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
