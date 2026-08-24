@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Clock,
   Music,
@@ -9,23 +9,33 @@ import {
   Search,
   CheckCircle2,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   Share2,
-  Lock,
   Flame,
   Volume2,
-  Compass,
+  BookOpen,
+  MapPin,
+  Church,
+  Info,
+  LogOut,
+  Key,
 } from 'lucide-react';
 import { useVigilia } from '../context/VigiliaContext';
-import { getCurrentMomentStatus, formatFullDate } from '../utils/timeUtils';
-import { PrayerCategory } from '../types';
+import {
+  getCurrentMomentStatus,
+  formatFullDate,
+  calculateDurationMinutes,
+  calculateTotalVigilProgress,
+  formatDurationHuman,
+} from '../utils/timeUtils';
+import { PrayerCategory, ScheduleMoment } from '../types';
 
 export const MemberView: React.FC<{
   onOpenDirigenteAuth?: () => void;
   onOpenProjector?: () => void;
-  onOpenAuthModal?: () => void;
-}> = ({ onOpenDirigenteAuth, onOpenProjector, onOpenAuthModal }) => {
-  const handleOpenAuth = onOpenDirigenteAuth || onOpenAuthModal;
+  onLogout?: () => void;
+}> = ({ onOpenDirigenteAuth, onOpenProjector, onLogout }) => {
   const {
     config,
     moments,
@@ -35,11 +45,16 @@ export const MemberView: React.FC<{
     incrementPrayer,
     notices,
     currentTime,
+    ministers,
   } = useVigilia();
 
-  const [activeTab, setActiveTab] = useState<'ao_vivo' | 'escala' | 'repertorio' | 'minha_escala' | 'oracao' | 'avisos'>('ao_vivo');
+  const [activeTab, setActiveTab] = useState<'agora' | 'minha_escala' | 'programacao' | 'repertorio' | 'oracoes' | 'avisos'>('agora');
   const [searchTerm, setSearchTerm] = useState('');
-  const [myScaleSearch, setMyScaleSearch] = useState('');
+  const [selectedMemberName, setSelectedMemberName] = useState<string>('');
+  const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
+
+  // Seconds clock for ultra-smooth countdowns in active view
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
 
   // Prayer Request Form State
   const [showPrayerModal, setShowPrayerModal] = useState(false);
@@ -56,7 +71,85 @@ export const MemberView: React.FC<{
 
   const { activeMoment, nextMoment, upcomingMoments, progressPercent, minutesRemaining } = momentStatus;
 
-  // Filtered Moments for Schedule Tab
+  // Total Vigil Progress
+  const totalProgress = useMemo(() => {
+    return calculateTotalVigilProgress(currentTime, config.startTime, config.endTime);
+  }, [currentTime, config.startTime, config.endTime]);
+
+  // Live second-by-second countdown for the active moment
+  useEffect(() => {
+    if (!activeMoment) {
+      setSecondsRemaining(0);
+      return;
+    }
+
+    const calcSeconds = () => {
+      const now = new Date();
+      const currentSecondsInDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+      const [eh, em] = activeMoment.endTime.split(':').map(Number);
+      let endSecondsInDay = eh * 3600 + em * 60;
+
+      const [sh, sm] = activeMoment.startTime.split(':').map(Number);
+      const startSecondsInDay = sh * 3600 + sm * 60;
+
+      if (endSecondsInDay <= startSecondsInDay) {
+        endSecondsInDay += 24 * 3600;
+      }
+      let currentNorm = currentSecondsInDay;
+      if (currentNorm < startSecondsInDay && now.getHours() < 12) {
+        currentNorm += 24 * 3600;
+      }
+
+      const diff = Math.max(0, endSecondsInDay - currentNorm);
+      setSecondsRemaining(diff);
+    };
+
+    calcSeconds();
+    const interval = setInterval(calcSeconds, 1000);
+    return () => clearInterval(interval);
+  }, [activeMoment]);
+
+  const formatSecondsToMinutesSeconds = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // Active moment duration
+  const activeDurationMinutes = activeMoment
+    ? calculateDurationMinutes(activeMoment.startTime, activeMoment.endTime, config.startTime)
+    : 0;
+
+  // List of all distinct minister and responsible names for quick selection in "Minha Escala"
+  const distinctResponsibleNames = useMemo(() => {
+    const namesSet = new Set<string>();
+    ministers.forEach((m) => {
+      if (m.name) namesSet.add(m.name.trim());
+    });
+    moments.forEach((m) => {
+      if (m.responsible) namesSet.add(m.responsible.trim());
+    });
+    repertoire.forEach((s) => {
+      if (s.responsible) namesSet.add(s.responsible.trim());
+    });
+    return Array.from(namesSet).sort();
+  }, [ministers, moments, repertoire]);
+
+  // "Minha Escala" items
+  const myMoments = useMemo(() => {
+    if (!selectedMemberName.trim()) return [];
+    const term = selectedMemberName.toLowerCase().trim();
+    return moments.filter((m) => m.responsible && m.responsible.toLowerCase().includes(term));
+  }, [moments, selectedMemberName]);
+
+  const mySongs = useMemo(() => {
+    if (!selectedMemberName.trim()) return [];
+    const term = selectedMemberName.toLowerCase().trim();
+    return repertoire.filter((s) => s.responsible && s.responsible.toLowerCase().includes(term));
+  }, [repertoire, selectedMemberName]);
+
+  // Filtered Moments for Programação
   const filteredMoments = useMemo(() => {
     if (!searchTerm.trim()) return moments;
     const term = searchTerm.toLowerCase();
@@ -69,22 +162,16 @@ export const MemberView: React.FC<{
     );
   }, [moments, searchTerm]);
 
-  // "Minha Escala" calculation
-  const myScaleItems = useMemo(() => {
-    if (!myScaleSearch.trim()) return [];
-    const term = myScaleSearch.toLowerCase();
-    return moments.filter((m) => m.responsible && m.responsible.toLowerCase().includes(term));
-  }, [moments, myScaleSearch]);
-
-  const myScaleSongs = useMemo(() => {
-    if (!myScaleSearch.trim()) return [];
-    const term = myScaleSearch.toLowerCase();
-    return repertoire.filter((s) => s.responsible && s.responsible.toLowerCase().includes(term));
-  }, [repertoire, myScaleSearch]);
-
+  // WhatsApp sharing message
   const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
-      `⛪ *${config.churchName}*\n🌟 *${config.vigilName}*\n\nAcompanhe a programação ao vivo pelo link: ${window.location.origin}\nCódigo de Acesso: *${config.memberCode || config.accessCode}*`
+      `⛪ *${config.churchName || 'Igreja Local'}*\n` +
+      `🌙 *${config.vigilName || 'Vigília de Oração'}*\n` +
+      (config.theme ? `Tema: _"${config.theme}"_\n` : '') +
+      `📅 Data: ${formatFullDate(config.date)}\n` +
+      `⏰ Horário: ${config.startTime} às ${config.endTime}\n` +
+      `🔑 Código da Vigília: *${config.memberCode || config.accessCode}*\n\n` +
+      `Acompanhe a programação ao vivo e louvores pelo link:\n${window.location.origin}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
@@ -94,7 +181,7 @@ export const MemberView: React.FC<{
     if (!prayerText.trim()) return;
 
     addPrayerRequest({
-      authorName: isAnonymous ? 'Anônimo' : authorName.trim() || 'Irmão(ã) em Cristo',
+      authorName: isAnonymous ? 'Anônimo' : authorName.trim() || 'Participante',
       request: prayerText.trim(),
       category,
       isAnonymous,
@@ -110,33 +197,71 @@ export const MemberView: React.FC<{
     }, 1800);
   };
 
-  return (
-    <div id="member-root" className="min-h-screen bg-[#0B0D10] text-[#F2F2F2] pb-20 font-sans selection:bg-[#C9B27C]/30">
-      {/* Top Header Card */}
-      <header id="member-header" className="relative overflow-hidden border-b border-[#292E36] bg-gradient-to-b from-[#191D24] via-[#14171C] to-[#0B0D10] px-4 pt-6 pb-6 text-center">
-        {/* Subtle glowing accents */}
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-72 h-32 bg-[#C9B27C]/10 blur-3xl pointer-events-none rounded-full" />
+  const getMomentTypeIcon = (type: string) => {
+    switch (type) {
+      case 'louvor':
+      case 'louvor_especial':
+        return '🎵';
+      case 'oracao':
+      case 'intercessao':
+        return '🙏';
+      case 'pregacao':
+        return '📖';
+      case 'testemunho':
+        return '💬';
+      case 'dinamica':
+        return '👥';
+      case 'ceia':
+        return '🍞';
+      case 'pausa':
+        return '☕';
+      default:
+        return '✨';
+    }
+  };
 
-        <div className="relative max-w-lg mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0B0D10] border border-[#C9B27C]/30 text-[#C9B27C] text-xs font-semibold tracking-wide uppercase mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{config.churchName || 'Igreja Local'}</span>
+  return (
+    <div id="member-root" className="min-h-screen bg-[#0B0D10] text-[#F2F2F2] pb-24 font-sans selection:bg-[#C9B27C]/30">
+      {/* Top Header Card (Reverent, Liturgical & Clean) */}
+      <header className="relative overflow-hidden border-b border-[#292E36] bg-gradient-to-b from-[#191D24] via-[#14171C] to-[#0B0D10] px-4 pt-6 pb-6 text-center">
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-36 bg-[#C9B27C]/10 blur-3xl pointer-events-none rounded-full" />
+
+        <div className="relative max-w-xl mx-auto space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0B0D10] border border-[#C9B27C]/30 text-[#C9B27C] text-xs font-semibold uppercase tracking-wider">
+              <Church className="w-3.5 h-3.5" />
+              <span>{config.churchName || 'Igreja Local'}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-lg bg-[#14171C] border border-[#292E36] text-[11px] font-mono text-[#9FA4AD]">
+                Código: <strong className="text-[#C9B27C]">{config.memberCode || config.accessCode}</strong>
+              </span>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  title="Trocar de código / Sair"
+                  className="p-1.5 rounded-lg bg-[#14171C] hover:bg-[#1f242d] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] transition text-xs"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F2F2F2] mb-2 leading-tight font-serif">
-            {config.vigilName || 'Vigília de Oração'}
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F2F2F2] font-serif">
+            {config.vigilName || 'Vigília de Oração e Louvor'}
           </h1>
 
           {config.theme && (
-            <p className="text-[#9FA4AD] text-sm font-medium mb-3 max-w-md mx-auto line-clamp-2">
+            <p className="text-[#C9B27C] text-sm sm:text-base font-medium font-serif italic">
               "{config.theme}"
             </p>
           )}
 
           {config.keyVerse && (
-            <div className="bg-[#14171C] border border-[#292E36] rounded-xl p-3 text-xs text-[#9FA4AD] italic mb-4 max-w-md mx-auto shadow-inner">
-              <span className="text-[#C9B27C] font-semibold not-italic">📖 </span>
-              "{config.keyVerse}"
+            <div className="bg-[#14171C]/90 border border-[#292E36] rounded-xl p-3 text-xs text-[#9FA4AD] italic max-w-md mx-auto shadow-inner">
+              <span>"{config.keyVerse}"</span>
               {config.verseReference && (
                 <span className="block mt-1 font-bold text-[#C9B27C] not-italic text-[11px]">
                   — {config.verseReference}
@@ -145,71 +270,62 @@ export const MemberView: React.FC<{
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-[#9FA4AD]">
-            <span className="inline-flex items-center gap-1 bg-[#14171C] px-2.5 py-1 rounded-lg border border-[#292E36] text-[#F2F2F2]">
+          {/* Date, Time and Share Buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs text-[#9FA4AD]">
+            <span className="inline-flex items-center gap-1.5 bg-[#14171C] px-3 py-1 rounded-lg border border-[#292E36] text-[#F2F2F2]">
               <Calendar className="w-3.5 h-3.5 text-[#C9B27C]" />
               {formatFullDate(config.date)}
             </span>
-            <span className="inline-flex items-center gap-1 bg-[#14171C] px-2.5 py-1 rounded-lg border border-[#292E36] text-[#F2F2F2]">
+            <span className="inline-flex items-center gap-1.5 bg-[#14171C] px-3 py-1 rounded-lg border border-[#292E36] text-[#F2F2F2]">
               <Clock className="w-3.5 h-3.5 text-[#C9B27C]" />
-              {config.startTime} às {config.endTime}
+              {config.startTime} → {config.endTime}
             </span>
             <button
-              id="btn-member-share"
               onClick={handleShareWhatsApp}
-              className="inline-flex items-center gap-1 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-medium transition"
+              className="inline-flex items-center gap-1.5 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-lg font-semibold transition"
             >
               <Share2 className="w-3.5 h-3.5" />
-              Compartilhar
+              WhatsApp
             </button>
           </div>
         </div>
       </header>
 
-      {/* Modern Tab Navigation Pills */}
-      <nav id="member-nav" className="sticky top-0 z-30 bg-[#0B0D10]/95 backdrop-blur-md border-b border-[#292E36] px-2 py-2 overflow-x-auto no-scrollbar">
+      {/* Discrete Overall Vigil Progress Bar */}
+      <div className="bg-[#14171C] border-b border-[#292E36] px-4 py-2">
+        <div className="max-w-xl mx-auto flex items-center justify-between text-[11px] text-[#9FA4AD] gap-3">
+          <div className="flex items-center gap-1.5 font-mono">
+            <span className="text-[#F2F2F2] font-semibold">Vigília</span>
+            <span>{config.startTime} → {config.endTime}</span>
+          </div>
+          <div className="flex-1 max-w-[140px] sm:max-w-[200px] h-2 bg-[#0B0D10] rounded-full overflow-hidden border border-[#292E36]">
+            <div
+              className="h-full bg-[#C9B27C] rounded-full transition-all duration-700"
+              style={{ width: `${totalProgress.percent}%` }}
+            />
+          </div>
+          <span className="font-mono font-bold text-[#C9B27C]">
+            {totalProgress.percent}% concluída
+          </span>
+        </div>
+      </div>
+
+      {/* Clean Navigation Tabs */}
+      <nav className="sticky top-0 z-30 bg-[#0B0D10]/95 backdrop-blur-md border-b border-[#292E36] px-2 py-2 overflow-x-auto no-scrollbar">
         <div className="flex items-center justify-start sm:justify-center gap-1.5 min-w-max max-w-xl mx-auto px-2">
           <button
-            id="tab-btn-ao-vivo"
-            onClick={() => setActiveTab('ao_vivo')}
+            onClick={() => setActiveTab('agora')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-              activeTab === 'ao_vivo'
+              activeTab === 'agora'
                 ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
                 : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
             }`}
           >
-            <Flame className={`w-3.5 h-3.5 ${activeTab === 'ao_vivo' ? 'text-[#0B0D10] animate-pulse' : 'text-[#C9B27C]'}`} />
-            Ao Vivo
+            <Flame className={`w-3.5 h-3.5 ${activeTab === 'agora' ? 'text-[#0B0D10]' : 'text-rose-400 animate-pulse'}`} />
+            🔴 Agora & Próximo
           </button>
 
           <button
-            id="tab-btn-escala"
-            onClick={() => setActiveTab('escala')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-              activeTab === 'escala'
-                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
-                : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            Cronograma
-          </button>
-
-          <button
-            id="tab-btn-repertorio"
-            onClick={() => setActiveTab('repertorio')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-              activeTab === 'repertorio'
-                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
-                : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
-            }`}
-          >
-            <Music className="w-3.5 h-3.5" />
-            Repertório ({repertoire.length})
-          </button>
-
-          <button
-            id="tab-btn-minha-escala"
             onClick={() => setActiveTab('minha_escala')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
               activeTab === 'minha_escala'
@@ -218,176 +334,176 @@ export const MemberView: React.FC<{
             }`}
           >
             <User className="w-3.5 h-3.5" />
-            Minha Escala
+            👤 Minha Escala
           </button>
 
           <button
-            id="tab-btn-oracao"
-            onClick={() => setActiveTab('oracao')}
+            onClick={() => setActiveTab('programacao')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-              activeTab === 'oracao'
+              activeTab === 'programacao'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            📋 Programação
+          </button>
+
+          <button
+            onClick={() => setActiveTab('repertorio')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
+              activeTab === 'repertorio'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
+            }`}
+          >
+            <Music className="w-3.5 h-3.5" />
+            🎵 Repertório ({repertoire.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('oracoes')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
+              activeTab === 'oracoes'
                 ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
                 : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
             }`}
           >
             <Heart className="w-3.5 h-3.5 text-rose-400" />
-            Oração ({prayerRequests.length})
-          </button>
-
-          <button
-            id="tab-btn-avisos"
-            onClick={() => setActiveTab('avisos')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-              activeTab === 'avisos'
-                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
-                : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
-            }`}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            Avisos ({notices.length})
+            🙏 Orações
           </button>
         </div>
       </nav>
 
-      {/* Main Container */}
-      <main className="max-w-xl mx-auto px-4 pt-5">
-        {/* ===================== TAB: AO VIVO ===================== */}
-        {activeTab === 'ao_vivo' && (
-          <div id="section-ao-vivo" className="space-y-4">
-            {/* Live Card: AGORA */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#191D24] via-[#14171C] to-[#0B0D10] border-2 border-[#C9B27C]/40 p-5 shadow-xl">
+      {/* Main Content Area */}
+      <main className="max-w-xl mx-auto px-4 pt-5 space-y-5">
+        {/* ===================== TAB: AGORA ===================== */}
+        {activeTab === 'agora' && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* 🔴 AGORA CARD */}
+            <div className="rounded-3xl bg-gradient-to-br from-[#191D24] via-[#14171C] to-[#0E1116] border-2 border-[#C9B27C]/40 p-5 sm:p-6 shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold uppercase tracking-wider">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                  <span>Acontecendo Agora</span>
+                  <span>🔴 AGORA</span>
                 </div>
-                <div className="text-xs font-mono font-semibold text-[#9FA4AD]">
-                  Horário: <span className="text-[#F2F2F2] font-bold">{currentTime}</span>
+                <div className="text-xs font-mono font-bold text-[#9FA4AD] bg-[#0B0D10] px-2.5 py-1 rounded-lg border border-[#292E36]">
+                  Horário Atual: <span className="text-[#F2F2F2]">{currentTime}</span>
                 </div>
               </div>
 
               {activeMoment ? (
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mb-2">
-                    {activeMoment.title}
-                  </h2>
-
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-[#9FA4AD] mb-4">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-[#F2F2F2] leading-tight">
+                      {getMomentTypeIcon(activeMoment.type)} {activeMoment.title}
+                    </h2>
                     {activeMoment.responsible && (
-                      <span className="inline-flex items-center gap-1.5 font-semibold text-[#C9B27C] bg-[#C9B27C]/10 px-2.5 py-1 rounded-lg border border-[#C9B27C]/20">
-                        <User className="w-3.5 h-3.5" />
-                        {activeMoment.responsible}
-                      </span>
+                      <p className="text-sm font-semibold text-[#C9B27C] flex items-center gap-1.5 mt-1.5">
+                        <User className="w-4 h-4 text-[#C9B27C]" />
+                        <span>{activeMoment.responsible}</span>
+                      </p>
                     )}
-                    <span className="inline-flex items-center gap-1.5 text-[#F2F2F2] bg-[#0B0D10] border border-[#292E36] px-2.5 py-1 rounded-lg">
+                  </div>
+
+                  {/* Horário & Duração */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1 bg-[#0B0D10] px-3 py-1.5 rounded-xl border border-[#292E36] font-mono text-[#F2F2F2] font-semibold">
                       <Clock className="w-3.5 h-3.5 text-[#C9B27C]" />
-                      {activeMoment.startTime} às {activeMoment.endTime}
+                      {activeMoment.startTime} → {activeMoment.endTime}
+                    </span>
+                    <span className="inline-flex items-center gap-1 bg-[#0B0D10] px-3 py-1.5 rounded-xl border border-[#292E36] text-[#9FA4AD] font-medium">
+                      {formatDurationHuman(activeDurationMinutes)}
                     </span>
                   </div>
 
                   {activeMoment.description && (
-                    <p className="text-xs sm:text-sm text-[#9FA4AD] leading-relaxed mb-4 bg-[#0B0D10]/80 p-3 rounded-xl border border-[#292E36]">
+                    <p className="text-xs sm:text-sm text-[#9FA4AD] bg-[#0B0D10]/80 p-3 rounded-xl border border-[#292E36] leading-relaxed">
                       {activeMoment.description}
                     </p>
                   )}
 
                   {activeMoment.scripture && (
-                    <div className="text-xs font-serif italic text-[#C9B27C]/90 mb-4 flex items-center gap-1.5">
+                    <div className="text-xs font-serif italic text-[#C9B27C] flex items-center gap-1.5">
                       <span>📖 Texto Base:</span>
-                      <span className="font-semibold">{activeMoment.scripture}</span>
+                      <strong className="not-italic">{activeMoment.scripture}</strong>
                     </div>
                   )}
 
-                  {/* Progress Bar */}
-                  <div className="space-y-1.5 pt-2 border-t border-[#292E36]">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="text-[#9FA4AD]">Progresso da atividade</span>
-                      <span className="text-[#C9B27C] font-bold font-mono">
-                        {minutesRemaining > 0 ? `${minutesRemaining} min restantes` : 'Finalizando...'}
+                  {/* Dynamic Progress Bar & Countdown */}
+                  <div className="space-y-2 pt-2 border-t border-[#292E36]">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="text-[#9FA4AD]">Progresso</span>
+                      <span className="text-[#C9B27C] font-mono font-bold">
+                        {secondsRemaining > 0
+                          ? `Restam ${formatSecondsToMinutesSeconds(secondsRemaining)}`
+                          : minutesRemaining > 0
+                          ? `Restam ${minutesRemaining} min`
+                          : 'Finalizando atividade'}
                       </span>
                     </div>
-                    <div className="w-full h-2.5 bg-[#0B0D10] border border-[#292E36] rounded-full overflow-hidden p-0.5">
+
+                    <div className="w-full h-3 bg-[#0B0D10] border border-[#292E36] rounded-full overflow-hidden p-0.5">
                       <div
-                        className="h-full bg-gradient-to-r from-[#C9B27C] to-[#bfa872] rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-[#C9B27C] to-[#E3D1A5] rounded-full transition-all duration-700"
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6">
-                  <Clock className="w-10 h-10 text-[#C9B27C] mx-auto mb-2 opacity-80" />
-                  <h3 className="text-lg font-bold text-[#F2F2F2] mb-1">
+                <div className="text-center py-6 space-y-2">
+                  <Clock className="w-10 h-10 text-[#C9B27C] mx-auto opacity-70" />
+                  <h3 className="text-base font-bold text-[#F2F2F2]">
                     {momentStatus.isBeforeVigil ? 'Aguardando Início da Vigília' : 'Vigília Concluída'}
                   </h3>
-                  <p className="text-xs text-[#9FA4AD] max-w-sm mx-auto">
+                  <p className="text-xs text-[#9FA4AD] max-w-xs mx-auto">
                     {momentStatus.isBeforeVigil
-                      ? `A vigília começará pontualmente às ${config.startTime}. Prepare seu coração em oração!`
-                      : 'Obrigado por participar desta noite abençoada na presença do Senhor.'}
+                      ? `Início pontual às ${config.startTime}. Acompanhe com reverência e oração.`
+                      : 'Todas as atividades foram concluídas com sucesso. Deus abençoe!'}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Next Card: A SEGUIR */}
+            {/* ⏭️ PRÓXIMO CARD */}
             {nextMoment && (
-              <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 shadow-md">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#9FA4AD] uppercase tracking-wider mb-2">
-                  <ChevronRight className="w-4 h-4 text-[#C9B27C]" />
-                  <span>A Seguir</span>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-[#F2F2F2]">
-                      {nextMoment.title}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-[#9FA4AD]">
-                      <span className="text-[#C9B27C] font-medium">{nextMoment.startTime}</span>
-                      <span>•</span>
-                      <span>{nextMoment.responsible || 'Equipe Geral'}</span>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-semibold bg-[#0B0D10] text-[#C9B27C] px-2 py-1 rounded-lg border border-[#292E36]">
-                    Próximo
+              <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 sm:p-5 shadow-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider flex items-center gap-1.5">
+                    <ChevronRight className="w-4 h-4 text-[#C9B27C]" />
+                    <span>⏭️ PRÓXIMO NO CRONOGRAMA</span>
+                  </span>
+                  <span className="font-mono text-xs font-bold text-[#C9B27C] bg-[#0B0D10] px-2.5 py-0.5 rounded-lg border border-[#292E36]">
+                    {nextMoment.startTime} → {nextMoment.endTime}
                   </span>
                 </div>
-              </div>
-            )}
 
-            {/* Upcoming Next 2 Moments */}
-            {upcomingMoments.length > 0 && (
-              <div className="rounded-2xl bg-[#14171C]/70 border border-[#292E36] p-4">
-                <h4 className="text-xs font-bold text-[#9FA4AD] uppercase tracking-wider mb-3">
-                  Próximos Momentos da Madrugada
-                </h4>
-                <div className="space-y-2.5">
-                  {upcomingMoments.map((mom, idx) => (
-                    <div
-                      key={mom.id || idx}
-                      className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-mono font-bold text-[#C9B27C] w-11">{mom.startTime}</span>
-                        <div>
-                          <p className="font-medium text-[#F2F2F2]">{mom.title}</p>
-                          <p className="text-[11px] text-[#9FA4AD]">{mom.responsible || '—'}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-[#9FA4AD] uppercase">{mom.type}</span>
-                    </div>
-                  ))}
+                <div className="space-y-1">
+                  <h3 className="text-base sm:text-lg font-bold text-[#F2F2F2]">
+                    {getMomentTypeIcon(nextMoment.type)} {nextMoment.title}
+                  </h3>
+                  {nextMoment.responsible && (
+                    <p className="text-xs text-[#C9B27C] font-semibold flex items-center gap-1">
+                      <User className="w-3.5 h-3.5" />
+                      <span>{nextMoment.responsible}</span>
+                    </p>
+                  )}
+                  <p className="text-[11px] text-[#9FA4AD]">
+                    Duração: {formatDurationHuman(calculateDurationMinutes(nextMoment.startTime, nextMoment.endTime, config.startTime))}
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Quick Prayer Banner */}
-            <div className="rounded-2xl bg-gradient-to-r from-rose-950/30 via-[#14171C] to-[#191D24] border border-rose-900/40 p-4 flex items-center justify-between gap-3">
+            <div className="rounded-2xl bg-gradient-to-r from-rose-950/30 via-[#14171C] to-[#14171C] border border-rose-900/40 p-4 flex items-center justify-between gap-3">
               <div>
                 <h4 className="text-sm font-bold text-rose-200 flex items-center gap-1.5">
                   <Heart className="w-4 h-4 text-rose-400" />
                   Precisa de Oração?
                 </h4>
-                <p className="text-xs text-[#9FA4AD] mt-0.5">
+                <p className="text-[11px] text-[#9FA4AD] mt-0.5">
                   Envie seu pedido para a equipe de intercessão orar por você.
                 </p>
               </div>
@@ -401,448 +517,456 @@ export const MemberView: React.FC<{
           </div>
         )}
 
-        {/* ===================== TAB: CRONOGRAMA ===================== */}
-        {activeTab === 'escala' && (
-          <div id="section-escala" className="space-y-4">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-[#9FA4AD] absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscar atividade, responsável ou horário..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#14171C] border border-[#292E36] text-[#F2F2F2] placeholder-[#9FA4AD]/50 text-xs focus:outline-none focus:border-[#C9B27C] transition"
-              />
-            </div>
-
-            {/* Moments Table List */}
-            <div className="space-y-2.5">
-              {filteredMoments.map((mom, idx) => {
-                const isCurrent = activeMoment?.id === mom.id;
-                return (
-                  <div
-                    key={mom.id || idx}
-                    className={`rounded-xl p-3.5 border transition ${
-                      isCurrent
-                        ? 'bg-[#C9B27C]/10 border-[#C9B27C]/50 shadow-lg'
-                        : 'bg-[#14171C] border-[#292E36] hover:border-[#292E36]/80'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-3">
-                        <div className="text-center min-w-[50px]">
-                          <span className={`font-mono text-xs font-bold block ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
-                            {mom.startTime}
-                          </span>
-                          <span className="text-[10px] text-[#9FA4AD] block">
-                            às {mom.endTime}
-                          </span>
-                        </div>
-                        <div className="border-l border-[#292E36] pl-3">
-                          <div className="flex items-center gap-2">
-                            <h4 className={`text-sm font-bold ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
-                              {mom.title}
-                            </h4>
-                            {isCurrent && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
-                                Agora
-                              </span>
-                            )}
-                          </div>
-
-                          {mom.responsible && (
-                            <p className="text-xs text-[#C9B27C]/90 font-medium mt-0.5 flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {mom.responsible}
-                            </p>
-                          )}
-
-                          {mom.scripture && (
-                            <p className="text-[11px] text-[#9FA4AD] italic mt-1">
-                              📖 {mom.scripture}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-[#0B0D10] text-[#9FA4AD] border border-[#292E36] shrink-0">
-                        {mom.type}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {filteredMoments.length === 0 && (
-                <div className="text-center py-10 bg-[#14171C] rounded-2xl border border-[#292E36]">
-                  <p className="text-xs text-[#9FA4AD]">Nenhuma atividade encontrada com "{searchTerm}".</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ===================== TAB: REPERTÓRIO ===================== */}
-        {activeTab === 'repertorio' && (
-          <div id="section-repertorio" className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-bold text-[#F2F2F2]">Repertório de Louvores</h3>
-                <p className="text-xs text-[#9FA4AD]">Músicas e cânticos para acompanhar na vigília</p>
-              </div>
-              <span className="text-xs font-bold text-[#C9B27C] bg-[#C9B27C]/10 px-2.5 py-1 rounded-lg border border-[#C9B27C]/20">
-                {repertoire.length} Louvores
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              {repertoire.map((song, idx) => (
-                <div
-                  key={song.id || idx}
-                  className="rounded-xl bg-[#14171C] border border-[#292E36] p-3.5 hover:border-[#C9B27C]/30 transition"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <span className="w-6 h-6 rounded-lg bg-[#0B0D10] text-[#C9B27C] border border-[#292E36] font-bold text-xs flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <h4 className="text-sm font-bold text-[#F2F2F2]">{song.title}</h4>
-                        <p className="text-xs text-[#9FA4AD]">{song.artist || 'Cantor / Ministério'}</p>
-
-                        {song.responsible && (
-                          <p className="text-[11px] text-[#C9B27C] font-medium mt-1">
-                            Resp: {song.responsible}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      {song.key && (
-                        <span className="inline-block text-xs font-bold font-mono bg-[#C9B27C]/15 text-[#C9B27C] border border-[#C9B27C]/30 px-2 py-0.5 rounded-md">
-                          Tom: {song.key}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {repertoire.length === 0 && (
-                <div className="text-center py-10 bg-[#14171C] rounded-2xl border border-[#292E36]">
-                  <Music className="w-8 h-8 text-[#9FA4AD] mx-auto mb-2" />
-                  <p className="text-xs text-[#9FA4AD]">Nenhum louvor cadastrado no repertório ainda.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* ===================== TAB: MINHA ESCALA ===================== */}
         {activeTab === 'minha_escala' && (
-          <div id="section-minha-escala" className="space-y-4">
-            <div className="bg-[#14171C] rounded-2xl border border-[#292E36] p-4">
-              <h3 className="text-base font-bold text-[#F2F2F2] mb-1 flex items-center gap-2">
-                <User className="w-4 h-4 text-[#C9B27C]" />
-                Consultar Minha Escala
-              </h3>
-              <p className="text-xs text-[#9FA4AD] mb-3">
-                Digite seu nome ou ministério para ver suas atividades e horários na vigília:
-              </p>
+          <div className="space-y-4 animate-fadeIn">
+            <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 space-y-3 shadow-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#C9B27C]/15 text-[#C9B27C] flex items-center justify-center font-bold">
+                  <User className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#F2F2F2]">👤 MINHA ESCALA</h2>
+                  <p className="text-[11px] text-[#9FA4AD]">Selecione ou digite seu nome para ver seus momentos</p>
+                </div>
+              </div>
 
-              <div className="relative">
-                <Search className="w-4 h-4 text-[#9FA4AD] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              {/* Selector or input for name */}
+              <div className="space-y-2 pt-1">
+                <label className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
+                  Escolha seu nome na lista:
+                </label>
+                <select
+                  value={selectedMemberName}
+                  onChange={(e) => setSelectedMemberName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs font-semibold text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C] transition"
+                >
+                  <option value="">-- Selecione seu nome / ministério --</option>
+                  {distinctResponsibleNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="text-center text-[10px] text-[#9FA4AD]">ou digite abaixo para buscar</div>
+
                 <input
                   type="text"
-                  placeholder="Ex: Carlos, Sarah, Louvor, Intercessão..."
-                  value={myScaleSearch}
-                  onChange={(e) => setMyScaleSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-[#F2F2F2] placeholder-[#9FA4AD]/50 text-xs focus:outline-none focus:border-[#C9B27C] transition font-medium"
+                  placeholder="Digite seu nome ou ministério..."
+                  value={selectedMemberName}
+                  onChange={(e) => setSelectedMemberName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] placeholder-[#9FA4AD]/40 focus:outline-none focus:border-[#C9B27C] transition"
                 />
               </div>
             </div>
 
-            {myScaleSearch.trim() ? (
+            {/* Results Display */}
+            {selectedMemberName.trim() ? (
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-[#C9B27C] uppercase tracking-wider">
-                  Suas Atividades no Cronograma ({myScaleItems.length})
-                </h4>
+                <div className="bg-[#14171C] border border-[#C9B27C]/30 rounded-xl p-3 text-xs text-[#C9B27C] font-semibold flex items-center justify-between">
+                  <span>
+                    Você participa de <strong>{myMoments.length + mySongs.length} momento(s)</strong> na vigília:
+                  </span>
+                  <span className="font-mono text-[11px] bg-[#0B0D10] px-2 py-0.5 rounded border border-[#292E36]">
+                    {selectedMemberName}
+                  </span>
+                </div>
 
-                {myScaleItems.map((m, idx) => (
-                  <div
-                    key={m.id || idx}
-                    className="rounded-xl bg-[#14171C] border border-[#C9B27C]/30 p-3.5 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-xs font-bold text-[#C9B27C]">
-                        {m.startTime} às {m.endTime}
-                      </span>
-                      <span className="text-[10px] font-semibold bg-[#0B0D10] text-[#9FA4AD] px-2 py-0.5 rounded uppercase border border-[#292E36]">
-                        {m.type}
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-[#F2F2F2]">{m.title}</h4>
-                    {m.description && <p className="text-xs text-[#9FA4AD] mt-1">{m.description}</p>}
+                {myMoments.length === 0 && mySongs.length === 0 ? (
+                  <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-8 text-center text-xs text-[#9FA4AD]">
+                    Nenhum momento encontrado para "{selectedMemberName}". Verifique a grafia ou selecione na lista acima.
                   </div>
-                ))}
-
-                {myScaleSongs.length > 0 && (
-                  <div className="pt-2">
-                    <h4 className="text-xs font-bold text-[#C9B27C] uppercase tracking-wider mb-2">
-                      Seus Louvores no Repertório ({myScaleSongs.length})
-                    </h4>
-                    <div className="space-y-2">
-                      {myScaleSongs.map((s, idx) => (
-                        <div key={s.id || idx} className="rounded-xl bg-[#14171C] border border-[#292E36] p-3 flex justify-between items-center text-xs">
-                          <div>
-                            <span className="font-bold text-[#F2F2F2]">{s.title}</span>
-                            <span className="text-[#9FA4AD] block">{s.artist}</span>
+                ) : (
+                  <div className="space-y-2.5">
+                    {/* Moments in schedule */}
+                    {myMoments.map((mom) => {
+                      const isExpanded = expandedMomentId === mom.id;
+                      const duration = calculateDurationMinutes(mom.startTime, mom.endTime, config.startTime);
+                      return (
+                        <div
+                          key={mom.id}
+                          onClick={() => setExpandedMomentId(isExpanded ? null : mom.id)}
+                          className="rounded-2xl bg-[#14171C] border border-[#292E36] hover:border-[#C9B27C]/40 p-4 transition-all cursor-pointer shadow-md"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="text-center min-w-[55px] bg-[#0B0D10] p-2 rounded-xl border border-[#292E36]">
+                                <span className="font-mono text-xs font-bold text-[#C9B27C] block">
+                                  {mom.startTime}
+                                </span>
+                                <span className="text-[10px] text-[#9FA4AD] block">
+                                  {mom.endTime}
+                                </span>
+                              </div>
+                              <div>
+                                <h3 className="text-sm sm:text-base font-bold text-[#F2F2F2] flex items-center gap-1.5">
+                                  <span>{getMomentTypeIcon(mom.type)}</span>
+                                  <span>{mom.title}</span>
+                                </h3>
+                                <p className="text-xs text-[#9FA4AD] mt-0.5">
+                                  Duração: {formatDurationHuman(duration)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-[#9FA4AD] p-1">
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </div>
                           </div>
-                          {s.key && (
-                            <span className="font-mono font-bold text-[#C9B27C] bg-[#C9B27C]/15 border border-[#C9B27C]/30 px-2 py-1 rounded">
-                              Tom: {s.key}
-                            </span>
+
+                          {/* Expanded Details */}
+                          {isExpanded && (
+                            <div className="mt-3 pt-3 border-t border-[#292E36] text-xs space-y-2 text-[#9FA4AD] animate-fadeIn">
+                              {mom.description && (
+                                <div>
+                                  <strong className="text-[#F2F2F2] block mb-0.5">Descrição:</strong>
+                                  <p className="bg-[#0B0D10] p-2.5 rounded-lg border border-[#292E36] text-xs leading-relaxed text-[#F2F2F2]">
+                                    {mom.description}
+                                  </p>
+                                </div>
+                              )}
+                              {mom.scripture && (
+                                <div className="flex items-center gap-1.5 text-[#C9B27C]">
+                                  <span>📖 Texto Bíblico:</span>
+                                  <strong>{mom.scripture}</strong>
+                                </div>
+                              )}
+                              <p className="text-[11px] text-[#C9B27C]/80 italic">
+                                * Por favor, esteja pronto 10 minutos antes do seu horário no púlpito/altar.
+                              </p>
+                            </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      );
+                    })}
 
-                {myScaleItems.length === 0 && myScaleSongs.length === 0 && (
-                  <div className="text-center py-8 bg-[#14171C] rounded-xl border border-[#292E36]">
-                    <p className="text-xs text-[#9FA4AD]">
-                      Nenhuma atividade encontrada para "{myScaleSearch}".
-                    </p>
+                    {/* Songs in repertoire */}
+                    {mySongs.map((song) => (
+                      <div
+                        key={song.id}
+                        className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex items-center justify-between gap-3 shadow-md"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="p-2 rounded-xl bg-[#0B0D10] text-[#C9B27C] border border-[#292E36]">
+                            🎵
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-bold text-[#F2F2F2]">{song.title}</h4>
+                            <p className="text-xs text-[#9FA4AD]">{song.artist || 'Ministério de Louvor'}</p>
+                          </div>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-[#C9B27C] bg-[#0B0D10] px-2.5 py-1 rounded-lg border border-[#292E36]">
+                          Tom {song.key}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-10 bg-[#14171C] rounded-2xl border border-[#292E36]">
-                <Compass className="w-8 h-8 text-[#C9B27C] mx-auto mb-2 opacity-80" />
+              <div className="rounded-2xl bg-[#14171C]/60 border border-[#292E36] p-8 text-center space-y-2">
+                <User className="w-8 h-8 text-[#C9B27C] mx-auto opacity-80" />
+                <h3 className="text-sm font-bold text-[#F2F2F2]">Consulte seus momentos na Vigília</h3>
                 <p className="text-xs text-[#9FA4AD] max-w-xs mx-auto">
-                  Digite seu nome no campo acima para filtrar sua escala individual.
+                  Selecione seu nome na caixa acima para visualizar exclusivamente os horários que você irá ministrar, orar ou cantar.
                 </p>
               </div>
             )}
           </div>
         )}
 
-        {/* ===================== TAB: ORAÇÃO ===================== */}
-        {activeTab === 'oracao' && (
-          <div id="section-oracao" className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
+        {/* ===================== TAB: PROGRAMAÇÃO ===================== */}
+        {activeTab === 'programacao' && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-[#9FA4AD] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar por momento, responsável ou texto bíblico..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#14171C] border border-[#292E36] text-[#F2F2F2] placeholder-[#9FA4AD]/40 text-xs focus:outline-none focus:border-[#C9B27C] transition"
+              />
+            </div>
+
+            {/* List of Moments */}
+            <div className="space-y-2.5">
+              {filteredMoments.map((mom) => {
+                const isCurrent = activeMoment?.id === mom.id;
+                const duration = calculateDurationMinutes(mom.startTime, mom.endTime, config.startTime);
+
+                return (
+                  <div
+                    key={mom.id}
+                    className={`rounded-2xl p-4 border transition ${
+                      isCurrent
+                        ? 'bg-[#C9B27C]/10 border-[#C9B27C]/50 shadow-xl'
+                        : 'bg-[#14171C] border-[#292E36] hover:border-[#292E36]/90'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="text-center min-w-[55px] bg-[#0B0D10] p-2 rounded-xl border border-[#292E36]">
+                          <span className={`font-mono text-xs font-bold block ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
+                            {mom.startTime}
+                          </span>
+                          <span className="text-[10px] text-[#9FA4AD] block font-mono">
+                            {mom.endTime}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className={`text-sm sm:text-base font-bold ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
+                              {getMomentTypeIcon(mom.type)} {mom.title}
+                            </h3>
+                            {isCurrent && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wider">
+                                Agora
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-[#9FA4AD]">
+                            {mom.responsible && (
+                              <span className="text-[#C9B27C] font-semibold">
+                                👤 {mom.responsible}
+                              </span>
+                            )}
+                            <span>•</span>
+                            <span>{formatDurationHuman(duration)}</span>
+                          </div>
+
+                          {mom.scripture && (
+                            <p className="text-[11px] font-serif italic text-[#9FA4AD]">
+                              📖 {mom.scripture}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ===================== TAB: REPERTÓRIO ===================== */}
+        {activeTab === 'repertorio' && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex items-center justify-between gap-3 shadow-lg">
               <div>
-                <h3 className="text-base font-bold text-[#F2F2F2]">Mural de Oração</h3>
-                <p className="text-xs text-[#9FA4AD]">Junte-se em oração pelos irmãos</p>
+                <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
+                  <span>🎵 REPERTÓRIO DA VIGÍLIA</span>
+                </h2>
+                <p className="text-xs text-[#9FA4AD]">Louvores e cânticos selecionados para a noite</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-[#0B0D10] text-[#C9B27C] border border-[#C9B27C]/30 text-xs font-mono font-bold">
+                {repertoire.length} louvores
+              </span>
+            </div>
+
+            {repertoire.length === 0 ? (
+              <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-8 text-center text-xs text-[#9FA4AD]">
+                Nenhum louvor cadastrado no repertório ainda.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {repertoire.map((song, index) => (
+                  <div
+                    key={song.id || index}
+                    className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex items-center justify-between gap-3 shadow-md hover:border-[#C9B27C]/30 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-xl bg-[#0B0D10] text-[#C9B27C] border border-[#292E36] flex items-center justify-center font-bold text-xs font-mono">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <h4 className="text-sm sm:text-base font-bold text-[#F2F2F2]">{song.title}</h4>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#9FA4AD] mt-0.5">
+                          <span>{song.artist || 'Ministério de Louvor'}</span>
+                          {song.responsible && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[#C9B27C]">👤 {song.responsible}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-mono text-xs font-bold text-[#C9B27C] bg-[#0B0D10] px-3 py-1.5 rounded-xl border border-[#292E36] block">
+                        Tom {song.key}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===================== TAB: ORAÇÕES ===================== */}
+        {activeTab === 'oracoes' && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex items-center justify-between gap-3 shadow-lg">
+              <div>
+                <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-rose-400" />
+                  <span>MURAL DE ORAÇÕES</span>
+                </h2>
+                <p className="text-xs text-[#9FA4AD]">Ore pelos irmãos e envie seu motivo de clamor</p>
               </div>
               <button
                 onClick={() => setShowPrayerModal(true)}
-                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition"
+                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition"
               >
-                <Heart className="w-3.5 h-3.5" />
-                Enviar Pedido
+                + Pedir Oração
               </button>
             </div>
 
             <div className="space-y-3">
-              {prayerRequests.map((prayer) => (
-                <div
-                  key={prayer.id}
-                  className="rounded-xl bg-[#14171C] border border-[#292E36] p-4 hover:border-[#C9B27C]/30 transition"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[#F2F2F2]">{prayer.authorName}</span>
-                      <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-[#0B0D10] border border-[#292E36] text-[#9FA4AD]">
+              {prayerRequests.length === 0 ? (
+                <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-8 text-center text-xs text-[#9FA4AD]">
+                  Nenhum pedido de oração cadastrado ainda. Seja o primeiro a pedir oração!
+                </div>
+              ) : (
+                prayerRequests.map((prayer) => (
+                  <div
+                    key={prayer.id}
+                    className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 space-y-2 shadow-md"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-[#F2F2F2] flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-[#C9B27C]" />
+                        {prayer.authorName}
+                      </span>
+                      <span className="text-[10px] text-[#9FA4AD] uppercase bg-[#0B0D10] px-2 py-0.5 rounded border border-[#292E36]">
                         {prayer.category}
                       </span>
                     </div>
-                    <span className="text-[10px] text-[#9FA4AD]">{prayer.createdAt}</span>
-                  </div>
 
-                  <p className="text-xs sm:text-sm text-[#F2F2F2]/90 leading-relaxed mb-3">
-                    {prayer.request}
-                  </p>
+                    <p className="text-xs sm:text-sm text-[#F2F2F2] leading-relaxed bg-[#0B0D10] p-3 rounded-xl border border-[#292E36]">
+                      "{prayer.request}"
+                    </p>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-[#292E36]">
-                    <span className="text-xs text-[#9FA4AD] font-medium flex items-center gap-1">
-                      <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
-                      {prayer.prayersCount} orando
-                    </span>
-
-                    <button
-                      onClick={() => incrementPrayer(prayer.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                        prayer.userPrayed
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                          : 'bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36]'
-                      }`}
-                    >
-                      <Heart className={`w-3.5 h-3.5 ${prayer.userPrayed ? 'fill-rose-400 text-rose-400' : ''}`} />
-                      {prayer.userPrayed ? 'Orando!' : 'Vou Orar'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {prayerRequests.length === 0 && (
-                <div className="text-center py-10 bg-[#14171C] rounded-2xl border border-[#292E36]">
-                  <p className="text-xs text-[#9FA4AD]">Nenhum pedido de oração enviado ainda. Seja o primeiro!</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ===================== TAB: AVISOS ===================== */}
-        {activeTab === 'avisos' && (
-          <div id="section-avisos" className="space-y-4">
-            <h3 className="text-base font-bold text-[#F2F2F2]">Comunicados & Avisos</h3>
-
-            <div className="space-y-3">
-              {notices.map((notice) => (
-                <div
-                  key={notice.id}
-                  className={`rounded-xl p-4 border ${
-                    notice.isUrgent
-                      ? 'bg-rose-950/20 border-rose-500/40'
-                      : 'bg-[#14171C] border-[#292E36]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <h4 className="text-sm font-bold text-[#F2F2F2]">{notice.title}</h4>
-                    {notice.isUrgent && (
-                      <span className="text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase">
-                        Importante
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] text-[#9FA4AD]">
+                        🙏 {prayer.prayersCount || 0} orações realizadas
                       </span>
-                    )}
+                      <button
+                        onClick={() => incrementPrayer(prayer.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 text-xs font-semibold transition"
+                      >
+                        <Heart className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Estou Orando</span>
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-[#9FA4AD] leading-relaxed">{notice.content}</p>
-                </div>
-              ))}
-
-              {notices.length === 0 && (
-                <div className="text-center py-10 bg-[#14171C] rounded-2xl border border-[#292E36]">
-                  <p className="text-xs text-[#9FA4AD]">Nenhum aviso no momento.</p>
-                </div>
+                ))
               )}
             </div>
           </div>
         )}
-
-        {/* Footer: Leadership / Change Code Button */}
-        <footer className="mt-12 text-center border-t border-[#292E36] pt-6">
-          <p className="text-[11px] text-[#9FA4AD] mb-2">
-            Vigília Planner • Código Ativo: <span className="font-mono text-[#C9B27C] font-bold">{config.memberCode || config.accessCode}</span>
-          </p>
-          <button
-            id="btn-open-leadership-access"
-            onClick={handleOpenAuth}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] text-xs font-semibold transition"
-          >
-            <Lock className="w-3.5 h-3.5 text-[#C9B27C]" />
-            <span>Área da Liderança / Trocar Código</span>
-          </button>
-        </footer>
       </main>
 
-      {/* Modal: Enviar Pedido de Oração */}
+      {/* Prayer Request Modal */}
       {showPrayerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-[#14171C] border border-[#292E36] p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-4 shadow-2xl animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
+              <h3 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
+                <Heart className="w-4 h-4 text-rose-400" />
+                <span>Enviar Pedido de Oração</span>
+              </h3>
+              <button
+                onClick={() => setShowPrayerModal(false)}
+                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-semibold p-1"
+              >
+                Fechar
+              </button>
+            </div>
+
             {prayerSubmitted ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3 animate-bounce" />
-                <h4 className="text-lg font-bold text-[#F2F2F2] mb-1">Pedido Enviado!</h4>
+              <div className="py-8 text-center space-y-2">
+                <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                <h4 className="text-base font-bold text-[#F2F2F2]">Pedido Enviado!</h4>
                 <p className="text-xs text-[#9FA4AD]">
-                  Seu pedido foi registrado e a igreja estará orando por você.
+                  Estaremos intercedendo por você durante a vigília. Deus te abençoe!
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleCreatePrayer} className="space-y-4">
-                <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
-                  <h4 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-rose-400" />
-                    Enviar Pedido de Oração
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => setShowPrayerModal(false)}
-                    className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-bold"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#F2F2F2]">Seu Nome (opcional)</label>
+              <form onSubmit={handleCreatePrayer} className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block mb-1">
+                    Seu Nome (opcional):
+                  </label>
                   <input
                     type="text"
                     disabled={isAnonymous}
-                    placeholder="Como prefere ser chamado"
+                    placeholder="Seu nome"
                     value={authorName}
                     onChange={(e) => setAuthorName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C] disabled:opacity-50"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
                   />
-                  <label className="flex items-center gap-2 text-xs text-[#9FA4AD] mt-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isAnonymous}
-                      onChange={(e) => setIsAnonymous(e.target.checked)}
-                      className="rounded border-[#292E36] bg-[#0B0D10] text-[#C9B27C] focus:ring-0"
-                    />
-                    Enviar como anônimo
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="anonCheck"
+                    checked={isAnonymous}
+                    onChange={(e) => setIsAnonymous(e.target.checked)}
+                    className="rounded bg-[#0B0D10] border-[#292E36] text-[#C9B27C] focus:ring-0"
+                  />
+                  <label htmlFor="anonCheck" className="text-xs text-[#9FA4AD] cursor-pointer">
+                    Manter pedido como Anônimo
                   </label>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#F2F2F2]">Categoria</label>
+                <div>
+                  <label className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block mb-1">
+                    Categoria:
+                  </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as PrayerCategory)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
                   >
-                    <option value="geral">Geral</option>
+                    <option value="geral">Geral / Vida Cristã</option>
                     <option value="saude">Saúde / Cura</option>
-                    <option value="familia">Família / Casamento</option>
+                    <option value="familia">Família / Lar</option>
                     <option value="espiritual">Vida Espiritual</option>
                     <option value="trabalho">Trabalho / Finanças</option>
                     <option value="libertacao">Libertação</option>
-                    <option value="gratidao">Gratidão</option>
-                    <option value="jovens">Jovens e Filhos</option>
+                    <option value="gratidao">Gratidão / Louvor</option>
+                    <option value="jovens">Juventude</option>
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#F2F2F2]">Motivo de Oração</label>
+                <div>
+                  <label className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block mb-1">
+                    Motivo de Oração:
+                  </label>
                   <textarea
                     required
                     rows={3}
-                    placeholder="Descreva o que Deus pode fazer na sua vida..."
+                    placeholder="Escreva seu motivo de oração..."
                     value={prayerText}
                     onChange={(e) => setPrayerText(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
                   />
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowPrayerModal(false)}
-                    className="flex-1 py-2 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-[#9FA4AD] text-xs font-bold border border-[#292E36]"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md"
-                  >
-                    Confirmar Pedido
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition"
+                >
+                  Enviar Motivo de Oração
+                </button>
               </form>
             )}
           </div>

@@ -297,6 +297,121 @@ export function calculateVigilDurationHours(startTime: string = '21:00', endTime
 }
 
 /**
+ * Calculates total vigil progress percentage and details
+ */
+export function calculateTotalVigilProgress(
+  currentTimeStr: string,
+  vigilStartTimeStr: string = '21:00',
+  vigilEndTimeStr: string = '05:00'
+): {
+  percent: number;
+  totalMinutes: number;
+  elapsedMinutes: number;
+  remainingMinutes: number;
+  isCompleted: boolean;
+  isNotStarted: boolean;
+} {
+  const startM = timeToMinutes(vigilStartTimeStr);
+  const endM = timeToMinutes(vigilEndTimeStr);
+  const normStart = normalizeVigilMinutes(startM, startM);
+  let normEnd = normalizeVigilMinutes(endM, startM);
+  if (normEnd <= normStart) {
+    normEnd += 1440;
+  }
+
+  const currentM = timeToMinutes(currentTimeStr);
+  const normCurrent = normalizeVigilMinutes(currentM, startM);
+
+  const totalMinutes = Math.max(1, normEnd - normStart);
+  const isNotStarted = normCurrent < normStart;
+  const isCompleted = normCurrent >= normEnd;
+
+  if (isNotStarted) {
+    return {
+      percent: 0,
+      totalMinutes,
+      elapsedMinutes: 0,
+      remainingMinutes: totalMinutes,
+      isCompleted: false,
+      isNotStarted: true,
+    };
+  }
+
+  if (isCompleted) {
+    return {
+      percent: 100,
+      totalMinutes,
+      elapsedMinutes: totalMinutes,
+      remainingMinutes: 0,
+      isCompleted: true,
+      isNotStarted: false,
+    };
+  }
+
+  const elapsedMinutes = Math.max(0, normCurrent - normStart);
+  const remainingMinutes = Math.max(0, normEnd - normCurrent);
+  const percent = Math.min(100, Math.max(0, Math.round((elapsedMinutes / totalMinutes) * 100)));
+
+  return {
+    percent,
+    totalMinutes,
+    elapsedMinutes,
+    remainingMinutes,
+    isCompleted: false,
+    isNotStarted: false,
+  };
+}
+
+/**
+ * Returns clean vigil delay status label and styling
+ */
+export function getVigilDelayStatus(delayMinutes: number): {
+  type: 'on_time' | 'early' | 'delayed';
+  label: string;
+  badgeClass: string;
+  iconColor: string;
+} {
+  if (delayMinutes === 0) {
+    return {
+      type: 'on_time',
+      label: 'NO HORÁRIO',
+      badgeClass: 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40',
+      iconColor: 'text-emerald-400',
+    };
+  }
+  if (delayMinutes < 0) {
+    const mins = Math.abs(delayMinutes);
+    return {
+      type: 'early',
+      label: `ADIANTADO ${mins} MIN`,
+      badgeClass: 'bg-amber-950/60 text-amber-300 border-amber-500/40',
+      iconColor: 'text-amber-400',
+    };
+  }
+  return {
+    type: 'delayed',
+    label: `ATRASADO ${delayMinutes} MIN`,
+    badgeClass: 'bg-rose-950/60 text-rose-300 border-rose-500/40',
+    iconColor: 'text-rose-400',
+  };
+}
+
+/**
+ * Formats duration in human readable string (e.g. 20 min or 1h 15min)
+ */
+export function formatDurationHuman(minutes: number): string {
+  if (minutes < 60) {
+    return `${minutes} minutos`;
+  }
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) {
+    return `${h}h`;
+  }
+  return `${h}h ${m} min`;
+}
+
+/**
  * Formats full human-readable date in Portuguese
  */
 export function formatFullDate(dateStr: string): string {
