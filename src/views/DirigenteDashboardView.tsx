@@ -173,6 +173,9 @@ export const DirigenteDashboardView: React.FC<{
   const [settingsForm, setSettingsForm] = useState({ ...config });
   const [settingsSaved, setSettingsSaved] = useState(false);
 
+  // State for expanded moment in schedule list (click to see full details)
+  const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
+
   // Search in schedule
   const [scheduleSearch, setScheduleSearch] = useState('');
 
@@ -586,24 +589,29 @@ export const DirigenteDashboardView: React.FC<{
                 </div>
 
                 {/* Moments List */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {filteredMoments.map((mom, index) => {
                     const isCurrent = activeMoment?.id === mom.id;
+                    const isExpanded = expandedMomentId === mom.id;
                     const duration = calculateDurationMinutes(mom.startTime, mom.endTime, config.startTime);
+                    const songsCount = mom.songsList ? mom.songsList.split('\n').filter((s) => s.trim().length > 0).length : 0;
 
                     return (
                       <div
                         key={mom.id}
-                        className={`rounded-2xl p-4 sm:p-5 border transition-all ${
+                        className={`rounded-2xl border transition-all overflow-hidden ${
                           isCurrent
                             ? 'bg-[#C9B27C]/10 border-[#C9B27C]/60 shadow-xl ring-1 ring-[#C9B27C]/30'
-                            : 'bg-[#14171C] border-[#292E36] hover:border-[#292E36]/90'
+                            : 'bg-[#14171C] border-[#292E36] hover:border-[#C9B27C]/40'
                         }`}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          {/* Left: Time and Title */}
-                          <div className="flex items-start gap-3.5">
-                            <div className="text-center min-w-[65px] bg-[#0B0D10] p-2.5 rounded-xl border border-[#292E36] shrink-0">
+                        {/* Compact Header Row (Click to toggle details) */}
+                        <div
+                          onClick={() => setExpandedMomentId(isExpanded ? null : mom.id)}
+                          className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer hover:bg-[#191D24]/50 transition select-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-center min-w-[62px] bg-[#0B0D10] px-2 py-1.5 rounded-xl border border-[#292E36] shrink-0">
                               <span className={`font-mono text-xs font-bold block ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
                                 {mom.startTime}
                               </span>
@@ -612,79 +620,109 @@ export const DirigenteDashboardView: React.FC<{
                               </span>
                             </div>
 
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <h3 className={`text-sm sm:text-base font-bold ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className={`text-sm sm:text-base font-bold truncate ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
                                   {getMomentTypeIcon(mom.type)} {mom.title}
                                 </h3>
                                 {isCurrent && (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wider">
-                                    Agora
+                                    🔴 AGORA
                                   </span>
                                 )}
                               </div>
 
                               <div className="flex flex-wrap items-center gap-2 text-xs text-[#9FA4AD]">
-                                <span className="font-semibold text-[#F2F2F2]">{formatDurationHuman(duration)}</span>
+                                <span className="font-mono text-[#F2F2F2]">{duration} min</span>
                                 {mom.responsible && (
                                   <>
                                     <span>•</span>
-                                    <span className="text-[#C9B27C] font-semibold">👤 {mom.responsible}</span>
+                                    <span className="text-[#C9B27C] font-semibold truncate">👤 {mom.responsible}</span>
                                   </>
                                 )}
-                                {mom.songsList && (
+                                {songsCount > 0 && (
                                   <>
                                     <span>•</span>
-                                    <span className="text-[#9FA4AD]">🎵 Louvores definidos</span>
+                                    <span className="text-[#9FA4AD] font-medium">🎵 {songsCount} louvor(es)</span>
                                   </>
                                 )}
                               </div>
-
-                              {mom.scripture && (
-                                <p className="text-[11px] font-serif italic text-[#9FA4AD]">
-                                  📖 {mom.scripture}
-                                </p>
-                              )}
                             </div>
                           </div>
 
-                          {/* Right: Actions */}
-                          <div className="flex items-center justify-end gap-1.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#292E36]">
-                            <button
-                              onClick={() => handleEditMoment(mom)}
-                              className="px-3 py-1.5 rounded-lg bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold transition"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => duplicateMoment(mom.id)}
-                              className="px-3 py-1.5 rounded-lg bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] text-xs transition"
-                              title="Duplicar atividade"
-                            >
-                              Duplicar
-                            </button>
-                            <button
-                              onClick={() => deleteMoment(mom.id)}
-                              className="p-1.5 rounded-lg bg-[#0B0D10] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-400 border border-[#292E36] text-xs transition"
-                              title="Excluir atividade"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#292E36]/60">
+                            <span className="text-[11px] text-[#9FA4AD] hover:text-[#C9B27C] font-semibold flex items-center gap-1">
+                              <span>{isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180 text-[#C9B27C]' : ''}`} />
+                            </span>
                           </div>
                         </div>
 
-                        {/* Extra Notes or Pulpit Details if present */}
-                        {(mom.slideNotes || mom.prayerMotives || mom.sermonTopic || mom.description) && (
-                          <div className="mt-3 pt-3 border-t border-[#292E36] text-xs text-[#9FA4AD] space-y-1">
+                        {/* Expandable Details Section */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-2 border-t border-[#292E36] bg-[#0B0D10]/50 space-y-3 text-xs">
+                            {mom.description && (
+                              <p className="text-[#9FA4AD] bg-[#0B0D10] p-3 rounded-xl border border-[#292E36] leading-relaxed">
+                                {mom.description}
+                              </p>
+                            )}
+
+                            {mom.scripture && (
+                              <p className="text-xs font-serif italic text-[#C9B27C]">
+                                📖 <strong>Texto Bíblico:</strong> {mom.scripture}
+                              </p>
+                            )}
+
                             {mom.sermonTopic && (
-                              <p><strong className="text-[#F2F2F2]">Esboço / Tema:</strong> {mom.sermonTopic}</p>
+                              <p className="text-[#F2F2F2]"><strong className="text-[#9FA4AD]">Esboço / Tema:</strong> {mom.sermonTopic}</p>
                             )}
+
                             {mom.prayerMotives && (
-                              <p><strong className="text-[#C9B27C]">Motivo de Clamor:</strong> {mom.prayerMotives}</p>
+                              <p className="text-[#C9B27C]"><strong className="text-[#9FA4AD]">Motivos de Oração:</strong> {mom.prayerMotives}</p>
                             )}
+
                             {mom.slideNotes && (
-                              <p><strong className="text-indigo-300">Instruções de Mídia:</strong> {mom.slideNotes}</p>
+                              <p className="text-indigo-300"><strong className="text-[#9FA4AD]">Instruções de Mídia:</strong> {mom.slideNotes}</p>
                             )}
+
+                            {mom.songsList && (
+                              <div className="bg-[#0B0D10] p-2.5 rounded-xl border border-[#292E36]">
+                                <span className="font-bold text-[#9FA4AD] block mb-1">Músicas deste momento:</span>
+                                <pre className="font-sans text-xs text-[#F2F2F2] whitespace-pre-wrap">{mom.songsList}</pre>
+                              </div>
+                            )}
+
+                            {/* Actions bar inside details */}
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditMoment(mom);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-[#14171C] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold transition"
+                              >
+                                Editar Atividade
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  duplicateMoment(mom.id);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-[#14171C] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] text-xs transition"
+                              >
+                                Duplicar
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteMoment(mom.id);
+                                }}
+                                className="p-1.5 rounded-lg bg-[#14171C] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-400 border border-[#292E36] text-xs transition"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
