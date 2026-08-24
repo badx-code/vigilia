@@ -1,0 +1,6 @@
+{
+  "name": "Vigília Planner Pro",
+  "description": "Plataforma profissional de organização e acompanhamento em tempo real de vigílias com 2 níveis de acesso simplificados: Área do Dirigente (Liderança e Administração) e Área do Membro (Pública), modo projetor/telão, gestão de atrasos e repertório.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
