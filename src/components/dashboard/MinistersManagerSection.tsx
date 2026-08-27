@@ -252,27 +252,34 @@ export const MinistersManagerSection: React.FC = () => {
 
       {/* Modal Add/Edit Minister */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-5 shadow-2xl animate-scaleUp my-8">
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto flex items-center justify-center">
+          <div className="relative w-full max-w-md my-auto rounded-3xl bg-[#14171C] border border-[#292E36] shadow-2xl animate-scaleUp flex flex-col max-h-[92vh]">
+            {/* Header: Always visible */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#292E36] shrink-0 bg-[#14171C] rounded-t-3xl">
               <h3 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#C9B27C]" />
                 <span>{editingId ? 'Editar Integrante da Equipe' : 'Escalar Nova Pessoa'}</span>
               </h3>
               <button
+                type="button"
                 onClick={() => setShowModal(false)}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-sm font-bold"
+                className="w-8 h-8 rounded-full bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] flex items-center justify-center text-sm font-bold transition border border-[#292E36] cursor-pointer"
+                title="Fechar"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4 text-xs">
+            {/* Scrollable Form Body */}
+            <form id="minister-form" onSubmit={handleSave} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Nome Completo *</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">
+                  Nome Completo *
+                </label>
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={form.name || ''}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Ex: Pr. Daniel Souza / Levita Amanda"
@@ -280,9 +287,9 @@ export const MinistersManagerSection: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Função / Cargo *</label>
+                  <label className="font-bold text-[#9FA4AD] block mb-1.5">Função / Cargo *</label>
                   <select
                     value={form.role || 'Pastor'}
                     onChange={(e) => setForm({ ...form, role: e.target.value as MinisterRole })}
@@ -301,7 +308,7 @@ export const MinistersManagerSection: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Horário de Atuação</label>
+                  <label className="font-bold text-[#9FA4AD] block mb-1.5">Horário de Atuação</label>
                   <input
                     type="text"
                     value={form.timeSlot || ''}
@@ -313,7 +320,7 @@ export const MinistersManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Telefone / WhatsApp</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Telefone / WhatsApp</label>
                 <input
                   type="text"
                   value={form.phone || ''}
@@ -324,7 +331,7 @@ export const MinistersManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">URL da Foto / Avatar</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">URL da Foto / Avatar</label>
                 <input
                   type="url"
                   value={form.photoUrl || ''}
@@ -335,7 +342,7 @@ export const MinistersManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Observações ou Instruções Específicas</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Observações ou Instruções Específicas</label>
                 <textarea
                   rows={2}
                   value={form.notes || ''}
@@ -344,23 +351,25 @@ export const MinistersManagerSection: React.FC = () => {
                   className="w-full px-3.5 py-2 rounded-xl bg-[#0B0D10] border border-[#292E36] text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
                 />
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#292E36]">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold shadow"
-                >
-                  {editingId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR ESCALA'}
-                </button>
-              </div>
             </form>
+
+            {/* Footer Buttons: Always visible */}
+            <div className="flex items-center justify-end gap-3 p-4 sm:p-5 border-t border-[#292E36] bg-[#0E1116] rounded-b-3xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] font-bold transition border border-[#292E36] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="minister-form"
+                className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold shadow transition cursor-pointer"
+              >
+                {editingId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR ESCALA'}
+              </button>
+            </div>
           </div>
         </div>
       )}

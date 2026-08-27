@@ -56,18 +56,18 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-2xl bg-[#14171C] border border-[#292E36] rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-none">
+    <div className="fixed inset-0 z-[100] p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto flex items-center justify-center animate-fadeIn">
+      <div className="relative w-full max-w-2xl my-auto bg-[#14171C] border border-[#292E36] rounded-3xl p-5 sm:p-7 shadow-2xl max-h-[92vh] flex flex-col">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-[#0B0D10] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] transition"
+          className="absolute top-5 right-5 p-2 rounded-full bg-[#0B0D10] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] transition z-10"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Modal Header */}
-        <div className="flex items-center gap-3 border-b border-[#292E36] pb-4 mb-6">
+        <div className="flex items-center gap-3 border-b border-[#292E36] pb-4 mb-4 shrink-0">
           <div className="w-10 h-10 rounded-xl bg-[#0B0D10] border border-[#C9B27C]/40 flex items-center justify-center text-[#C9B27C] shadow">
             <Edit3 className="w-5 h-5" />
           </div>
@@ -90,7 +90,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
             <p className="text-xs text-[#9FA4AD]">Os novos dados já estão ativos em toda a plataforma.</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1">
             {/* Nome da Vigília & Igreja */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

@@ -342,6 +342,7 @@ export interface VigiliaConfig {
   showScheduleInWaiting?: boolean;
   allowEarlyCheckin?: boolean;
   allowEarlyPrayers?: boolean;
+  manualActiveMomentIndex?: number | null;
 }
 
 export interface VigilTemplate {
@@ -359,6 +360,7 @@ export interface VigilItem {
   id: string;
   code: string;
   createdAt: string;
+  manualActiveMomentIndex?: number | null;
   config: VigiliaConfig;
   moments: ScheduleMoment[];
   ministers: Minister[];

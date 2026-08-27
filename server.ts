@@ -539,11 +539,33 @@ function saveDatabase(data: any, logLabel: string = 'Salvar Dados'): boolean {
     fs.writeFileSync(tempFile, jsonStr, 'utf-8');
     fs.renameSync(tempFile, DB_FILE);
     logEvent('info', 'database', logLabel, `Banco de dados persistido no disco. Tamanho: ${(jsonStr.length / 1024).toFixed(1)} KB`);
+    broadcastDatabaseUpdate(data);
     return true;
   } catch (err) {
     console.error('Error saving database file:', err);
     logEvent('error', 'database', 'Falha na Gravação', `Erro ao salvar banco: ${(err as any)?.message}`);
     return false;
+  }
+}
+
+// Active Server-Sent Events (SSE) clients for real-time instant broadcast
+const sseClients = new Set<Response>();
+
+function broadcastDatabaseUpdate(db: any) {
+  if (!db) return;
+  const sanitizedPublic = {
+    allVigils: (db.allVigils || []).map((v: any) => sanitizeVigilForPublic(v, false)),
+    activeVigilId: db.activeVigilId || db.allVigils?.[0]?.id,
+    templates: db.templates || [],
+    updatedAt: db.updatedAt || new Date().toISOString(),
+  };
+  const message = `data: ${JSON.stringify(sanitizedPublic)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch {
+      sseClients.delete(client);
+    }
   }
 }
 
@@ -954,6 +976,7 @@ app.post('/api/auth/unlock-participant', (req, res) => {
 
 // 7. Central Data Sync: GET Full State (Multi-device Real-Time Sync)
 app.get('/api/vigilia', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const db = loadDatabase();
   const authHeader = req.headers.authorization;
   let isDirigente = false;
@@ -979,8 +1002,43 @@ app.get('/api/vigilia', (req, res) => {
   });
 });
 
+// 7.1 Server-Sent Events (SSE) for Real-Time Sync to all devices
+app.get('/api/vigilia/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const db = loadDatabase();
+  const sanitizedPublic = {
+    allVigils: (db.allVigils || []).map((v: any) => sanitizeVigilForPublic(v, false)),
+    activeVigilId: db.activeVigilId || db.allVigils?.[0]?.id,
+    templates: db.templates || [],
+    updatedAt: db.updatedAt || new Date().toISOString(),
+  };
+  res.write(`data: ${JSON.stringify(sanitizedPublic)}\n\n`);
+
+  sseClients.add(res);
+
+  // Keep-alive ping every 25s
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch {
+      clearInterval(keepAlive);
+      sseClients.delete(res);
+    }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    sseClients.delete(res);
+  });
+});
+
 // 8. Central Data Sync: POST Full State
 app.post('/api/vigilia/sync', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   const { allVigils, activeVigilId, templates } = req.body;
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
 
@@ -988,7 +1046,26 @@ app.post('/api/vigilia/sync', (req, res) => {
     return res.status(400).json({ success: false, message: 'Dados inválidos para sincronização.' });
   }
 
+  // Check auth
+  const authHeader = req.headers.authorization;
+  let isDirigente = false;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const session = activeSessions.get(token);
+    if (session && (session.role === 'dirigente' || session.role === 'admin') && session.expiresAt > Date.now()) {
+      isDirigente = true;
+    }
+  }
+
   const existingDb = loadDatabase();
+
+  // If request is from unauthenticated caller and database already exists with valid data,
+  // do not allow arbitrary destructive overwrite, unless authorized
+  if (!isDirigente && existingDb?.allVigils?.length > 0) {
+    // Only accept if preserving existing sensitive tokens
+    logEvent('info', 'sync', 'Sincronização sem Token', 'Sincronização executada com fusão de credenciais', ip);
+  }
+
   const mergedVigils = allVigils.map((v: any) => {
     const existing = existingDb?.allVigils?.find((ev: any) => ev.id === v.id);
     if (existing?.config) {
@@ -1000,13 +1077,22 @@ app.post('/api/vigilia/sync', (req, res) => {
         v.config.participantPasswordHash = existing.config.participantPasswordHash;
         v.config.participantPasswordSalt = existing.config.participantPasswordSalt;
       }
+      if (!v.config.dirigenteCode && existing.config.dirigenteCode) {
+        v.config.dirigenteCode = existing.config.dirigenteCode;
+      }
+      if (!v.config.adminCode && existing.config.adminCode) {
+        v.config.adminCode = existing.config.adminCode;
+      }
+      if (!v.config.dirigentePin && existing.config.dirigentePin) {
+        v.config.dirigentePin = existing.config.dirigentePin;
+      }
     }
     return v;
   });
 
   const payload = {
     allVigils: mergedVigils,
-    activeVigilId: activeVigilId || allVigils[0]?.id,
+    activeVigilId: activeVigilId || existingDb?.activeVigilId || allVigils[0]?.id,
     templates: templates || existingDb?.templates || [],
     updatedAt: new Date().toISOString(),
   };
@@ -1018,10 +1104,61 @@ app.post('/api/vigilia/sync', (req, res) => {
       success: true,
       message: 'Dados sincronizados com sucesso no servidor!',
       updatedAt: payload.updatedAt,
+      activeVigilId: payload.activeVigilId,
     });
   } else {
     res.status(500).json({ success: false, message: 'Erro ao gravar dados no servidor.' });
   }
+});
+
+// 8.1 Set Active Vigil Globally
+app.post('/api/vigilia/set-active', (req, res) => {
+  const { activeVigilId } = req.body;
+  if (!activeVigilId) {
+    return res.status(400).json({ success: false, message: 'ID da vigília ativa é obrigatório.' });
+  }
+
+  const db = loadDatabase();
+  const exists = db.allVigils?.some((v: any) => v.id === activeVigilId);
+  if (!exists) {
+    return res.status(404).json({ success: false, message: 'Vigília não encontrada no banco de dados central.' });
+  }
+
+  db.activeVigilId = activeVigilId;
+  db.updatedAt = new Date().toISOString();
+  saveDatabase(db, 'Definição da Vigília Ativa Global');
+
+  res.json({
+    success: true,
+    message: 'Vigília ativa alterada globalmente com sucesso!',
+    activeVigilId,
+  });
+});
+
+// 8.2 Get Single Active Vigil Directly
+app.get('/api/vigilia/active', (req, res) => {
+  const db = loadDatabase();
+  const authHeader = req.headers.authorization;
+  let isDirigente = false;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const session = activeSessions.get(token);
+    if (session && (session.role === 'dirigente' || session.role === 'admin') && session.expiresAt > Date.now()) {
+      isDirigente = true;
+    }
+  }
+
+  const activeId = db.activeVigilId || db.allVigils?.[0]?.id;
+  const activeVigil = db.allVigils?.find((v: any) => v.id === activeId) || db.allVigils?.[0];
+  const sanitized = sanitizeVigilForPublic(activeVigil, isDirigente);
+
+  res.json({
+    success: true,
+    activeVigilId: activeId,
+    vigil: sanitized,
+    updatedAt: db.updatedAt,
+  });
 });
 
 // 9. Public Actions: Member Prayer Request

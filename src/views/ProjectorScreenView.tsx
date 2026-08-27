@@ -16,7 +16,7 @@ import { useVigilia } from '../context/VigiliaContext';
 import { getCurrentMomentStatus } from '../utils/timeUtils';
 
 export const ProjectorScreenView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { config, moments, currentTime } = useVigilia();
+  const { config, moments, currentTime, manualActiveMomentIndex } = useVigilia();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [secondsClock, setSecondsClock] = useState<string>('');
   const [showQrCorner, setShowQrCorner] = useState(true);
@@ -45,8 +45,14 @@ export const ProjectorScreenView: React.FC<{ onClose: () => void }> = ({ onClose
   };
 
   const momentStatus = useMemo(() => {
-    return getCurrentMomentStatus(moments, currentTime, config.startTime, config.endTime);
-  }, [moments, currentTime, config.startTime, config.endTime]);
+    return getCurrentMomentStatus(
+      moments,
+      currentTime,
+      config.startTime,
+      config.endTime,
+      manualActiveMomentIndex
+    );
+  }, [moments, currentTime, config.startTime, config.endTime, manualActiveMomentIndex]);
 
   const { activeMoment, nextMoment, progressPercent, minutesRemaining } = momentStatus;
   const memberLink = typeof window !== 'undefined' ? `${window.location.origin}` : '';

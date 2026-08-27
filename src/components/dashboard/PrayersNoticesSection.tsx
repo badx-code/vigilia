@@ -11,6 +11,7 @@ import {
   Heart,
   Clock,
   User,
+  Bell,
 } from 'lucide-react';
 import { PrayerRequest } from '../../types';
 
@@ -266,24 +267,32 @@ export const PrayersNoticesSection: React.FC = () => {
 
       {/* Modal Add Notice */}
       {showAddNoticeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-4 shadow-2xl animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
-              <h3 className="text-sm font-bold text-[#F2F2F2]">Publicar Novo Aviso Oficial</h3>
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto flex items-center justify-center">
+          <div className="relative w-full max-w-md my-auto rounded-3xl bg-[#14171C] border border-[#292E36] shadow-2xl animate-scaleUp flex flex-col max-h-[92vh]">
+            {/* Header: Always visible */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#292E36] shrink-0 bg-[#14171C] rounded-t-3xl">
+              <h3 className="text-sm font-bold text-[#F2F2F2] flex items-center gap-2">
+                <Bell className="w-4 h-4 text-[#C9B27C]" />
+                <span>Publicar Novo Aviso Oficial</span>
+              </h3>
               <button
+                type="button"
                 onClick={() => setShowAddNoticeModal(false)}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-sm font-bold"
+                className="w-8 h-8 rounded-full bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] flex items-center justify-center text-sm font-bold transition border border-[#292E36] cursor-pointer"
+                title="Fechar"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddNotice} className="space-y-3.5 text-xs">
+            {/* Scrollable Form Body */}
+            <form id="notice-form" onSubmit={handleAddNotice} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Título do Comunicado *</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Título do Comunicado *</label>
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={noticeTitle}
                   onChange={(e) => setNoticeTitle(e.target.value)}
                   placeholder="Ex: Horário do Café da Madrugada"
@@ -292,7 +301,7 @@ export const PrayersNoticesSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Conteúdo do Aviso *</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Conteúdo do Aviso *</label>
                 <textarea
                   rows={3}
                   required
@@ -303,7 +312,7 @@ export const PrayersNoticesSection: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
                   id="urgentCheck"
@@ -311,27 +320,29 @@ export const PrayersNoticesSection: React.FC = () => {
                   onChange={(e) => setNoticeIsUrgent(e.target.checked)}
                   className="w-4 h-4 rounded text-rose-500 bg-[#0B0D10] border-[#292E36]"
                 />
-                <label htmlFor="urgentCheck" className="text-xs font-semibold text-rose-300">
+                <label htmlFor="urgentCheck" className="text-xs font-semibold text-rose-300 cursor-pointer">
                   Marcar como Aviso Urgente / Destaque
                 </label>
               </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
-                <button
-                  type="button"
-                  onClick={() => setShowAddNoticeModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-[#0B0D10] text-[#9FA4AD] font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold shadow"
-                >
-                  PUBLICAR AVISO
-                </button>
-              </div>
             </form>
+
+            {/* Footer Buttons: Always visible */}
+            <div className="flex items-center justify-end gap-3 p-4 sm:p-5 border-t border-[#292E36] bg-[#0E1116] rounded-b-3xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAddNoticeModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] font-bold transition border border-[#292E36] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="notice-form"
+                className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold shadow transition cursor-pointer"
+              >
+                PUBLICAR AVISO
+              </button>
+            </div>
           </div>
         </div>
       )}

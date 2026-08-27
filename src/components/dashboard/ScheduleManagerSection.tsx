@@ -374,27 +374,32 @@ export const ScheduleManagerSection: React.FC = () => {
 
       {/* Modal Add/Edit Moment */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-5 shadow-2xl animate-scaleUp my-8">
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto flex items-center justify-center">
+          <div className="relative w-full max-w-lg my-auto rounded-3xl bg-[#14171C] border border-[#292E36] shadow-2xl animate-scaleUp flex flex-col max-h-[92vh]">
+            {/* Header: Always visible */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#292E36] shrink-0 bg-[#14171C] rounded-t-3xl">
               <h3 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#C9B27C]" />
                 <span>{editingId ? 'Editar Momento da Vigília' : 'Cadastrar Novo Momento'}</span>
               </h3>
               <button
+                type="button"
                 onClick={() => setShowModal(false)}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-sm font-bold"
+                className="w-8 h-8 rounded-full bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] flex items-center justify-center text-sm font-bold transition border border-[#292E36] cursor-pointer"
+                title="Fechar"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4 text-xs">
+            {/* Scrollable Form Body */}
+            <form id="moment-form" onSubmit={handleSave} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Título do Momento *</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Título do Momento *</label>
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={form.title || ''}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="Ex: Clamor pelas Famílias / Ministração da Palavra"
@@ -402,9 +407,9 @@ export const ScheduleManagerSection: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Tipo *</label>
+                  <label className="font-bold text-[#9FA4AD] block mb-1.5">Tipo *</label>
                   <select
                     value={form.type || 'oracao'}
                     onChange={(e) => setForm({ ...form, type: e.target.value as MomentType })}
@@ -422,7 +427,7 @@ export const ScheduleManagerSection: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Início *</label>
+                  <label className="font-bold text-[#9FA4AD] block mb-1.5">Início *</label>
                   <input
                     type="time"
                     required
@@ -433,7 +438,7 @@ export const ScheduleManagerSection: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Término *</label>
+                  <label className="font-bold text-[#9FA4AD] block mb-1.5">Término *</label>
                   <input
                     type="time"
                     required
@@ -445,7 +450,7 @@ export const ScheduleManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Responsável / Ministro</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Responsável / Ministro</label>
                 <input
                   type="text"
                   value={form.responsible || ''}
@@ -456,7 +461,7 @@ export const ScheduleManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Texto Bíblico / Referência</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Texto Bíblico / Referência</label>
                 <input
                   type="text"
                   value={form.scripture || ''}
@@ -467,7 +472,7 @@ export const ScheduleManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Instruções / Motivos de Oração</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Instruções / Motivos de Oração</label>
                 <textarea
                   rows={2}
                   value={form.prayerMotives || ''}
@@ -478,7 +483,7 @@ export const ScheduleManagerSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Descrição / Detalhes para o Púlpito</label>
+                <label className="font-bold text-[#9FA4AD] block mb-1.5">Descrição / Detalhes para o Púlpito</label>
                 <textarea
                   rows={2}
                   value={form.description || ''}
@@ -487,23 +492,25 @@ export const ScheduleManagerSection: React.FC = () => {
                   className="w-full px-3.5 py-2 rounded-xl bg-[#0B0D10] border border-[#292E36] text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
                 />
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#292E36]">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold shadow"
-                >
-                  {editingId ? 'SALVAR ALTERAÇÕES' : 'CADASTRAR MOMENTO'}
-                </button>
-              </div>
             </form>
+
+            {/* Footer Buttons: Always visible */}
+            <div className="flex items-center justify-end gap-3 p-4 sm:p-5 border-t border-[#292E36] bg-[#0E1116] rounded-b-3xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] font-bold transition border border-[#292E36] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="moment-form"
+                className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold shadow transition cursor-pointer"
+              >
+                {editingId ? 'SALVAR ALTERAÇÕES' : 'CADASTRAR MOMENTO'}
+              </button>
+            </div>
           </div>
         </div>
       )}

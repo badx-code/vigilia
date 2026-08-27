@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   VigiliaConfig,
   ScheduleMoment,
@@ -373,14 +373,29 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
   const [simulatedTime, setSimulatedTimeState] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [manualActiveMomentIndex, setManualActiveMomentIndex] = useState<number | null>(null);
+  const isInitialLoadedRef = useRef(false);
+  const isRemoteUpdateRef = useRef(false);
 
-  // Persist Vigils to Storage and Debounced API Sync
+  // Persist Vigils to Storage and Debounced API Sync (Only when Dirigente makes local change)
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.ALL_VIGILS, JSON.stringify(allVigils));
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_VIGIL_ID, activeVigilId);
     } catch (e) {
       console.error('Failed to persist vigils:', e);
+    }
+
+    if (!isInitialLoadedRef.current) return;
+
+    // If this state change was initiated by server fetch or SSE, skip re-syncing back
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false;
+      return;
+    }
+
+    // Only dirigente role should push full database mutations to server
+    if (userRole !== 'dirigente' && !authToken) {
+      return;
     }
 
     const timer = setTimeout(() => {
@@ -393,12 +408,12 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers,
         body: JSON.stringify({ allVigils, activeVigilId, templates }),
       }).catch(() => {});
-    }, 400);
+    }, 200);
 
     return () => clearTimeout(timer);
-  }, [allVigils, activeVigilId, templates, authToken]);
+  }, [allVigils, activeVigilId, templates, authToken, userRole]);
 
-  // Initial and Periodic Server Fetch (keeps multi-devices in sync every 4s)
+  // Initial fetch from central database, SSE real-time listener & fast polling
   useEffect(() => {
     const fetchServerData = () => {
       const headers: Record<string, string> = {};
@@ -406,24 +421,63 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers['Authorization'] = `Bearer ${authToken}`;
       }
 
-      fetch('/api/vigilia', { headers })
+      fetch('/api/vigilia', { headers, cache: 'no-store' })
         .then((r) => r.json())
         .then((res) => {
           if (res.success && res.data && Array.isArray(res.data.allVigils) && res.data.allVigils.length > 0) {
-            setAllVigils((prev) => {
-              // Merge server updates smoothly
-              return res.data.allVigils;
-            });
-            if (res.data.activeVigilId) setActiveVigilId(res.data.activeVigilId);
+            isRemoteUpdateRef.current = true;
+            setAllVigils(res.data.allVigils);
+            if (res.data.activeVigilId) {
+              setActiveVigilId(res.data.activeVigilId);
+            }
             if (res.data.templates) setTemplates(res.data.templates);
+            isInitialLoadedRef.current = true;
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          isInitialLoadedRef.current = true;
+        });
     };
 
+    // Initial load
     fetchServerData();
-    const interval = setInterval(fetchServerData, 4000);
-    return () => clearInterval(interval);
+
+    // SSE Real-time instant stream
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/vigilia/events');
+      eventSource.onmessage = (event) => {
+        try {
+          const res = JSON.parse(event.data);
+          if (res && Array.isArray(res.allVigils) && res.allVigils.length > 0) {
+            isRemoteUpdateRef.current = true;
+            setAllVigils(res.allVigils);
+            if (res.activeVigilId) {
+              setActiveVigilId(res.activeVigilId);
+            }
+            if (res.templates) setTemplates(res.templates);
+            isInitialLoadedRef.current = true;
+          }
+        } catch {
+          // ignore parse errors
+        }
+      };
+      eventSource.onerror = () => {
+        // EventSource handles auto-reconnect internally
+      };
+    } catch {
+      // ignore
+    }
+
+    // Fast fallback polling every 2 seconds
+    const interval = setInterval(fetchServerData, 2000);
+
+    return () => {
+      clearInterval(interval);
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   }, [authToken]);
 
   // Persist Active Vigil ID
@@ -523,6 +577,21 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const notices = activeVigil?.notices || defaultNotices;
   const usefulContacts = activeVigil?.usefulContacts || defaultUsefulContacts;
   const calendarEvents = activeVigil?.calendarEvents || defaultCalendarEvents;
+  const manualActiveMomentIndex = activeVigil?.manualActiveMomentIndex ?? activeVigil?.config?.manualActiveMomentIndex ?? null;
+
+  const setManualActiveMomentIndex = useCallback(
+    (index: number | null) => {
+      updateActiveVigil((prev) => ({
+        ...prev,
+        manualActiveMomentIndex: index,
+        config: {
+          ...prev.config,
+          manualActiveMomentIndex: index,
+        },
+      }));
+    },
+    [updateActiveVigil]
+  );
 
   // Summaries list
   const allVigilsList: VigilSummary[] = useMemo(() => {
@@ -1455,6 +1524,11 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Multi-Vigil Operations
   const switchVigilById = useCallback((id: string) => {
     setActiveVigilId(id);
+    fetch('/api/vigilia/set-active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activeVigilId: id }),
+    }).catch(() => {});
   }, []);
 
   const switchVigilByCode = useCallback(
@@ -1468,6 +1542,11 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
       );
       if (target) {
         setActiveVigilId(target.id);
+        fetch('/api/vigilia/set-active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activeVigilId: target.id }),
+        }).catch(() => {});
         return true;
       }
       return false;
@@ -1556,6 +1635,11 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setAllVigils((prev) => [newVigil, ...prev]);
       setActiveVigilId(newId);
+      fetch('/api/vigilia/set-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activeVigilId: newId }),
+      }).catch(() => {});
       return newId;
     },
     [templates]
@@ -1637,6 +1721,11 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setAllVigils((prev) => [newVigil, ...prev]);
       setActiveVigilId(newId);
+      fetch('/api/vigilia/set-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activeVigilId: newId }),
+      }).catch(() => {});
       return newId;
     },
     [templates]
@@ -1669,6 +1758,11 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setAllVigils((prev) => [duplicated, ...prev]);
       setActiveVigilId(newId);
+      fetch('/api/vigilia/set-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activeVigilId: newId }),
+      }).catch(() => {});
       return newId;
     },
     [allVigils]
@@ -1680,7 +1774,13 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const remaining = allVigils.filter((v) => v.id !== id);
       setAllVigils(remaining);
       if (activeVigilId === id) {
-        setActiveVigilId(remaining[0].id);
+        const nextActiveId = remaining[0].id;
+        setActiveVigilId(nextActiveId);
+        fetch('/api/vigilia/set-active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activeVigilId: nextActiveId }),
+        }).catch(() => {});
       }
       return true;
     },
