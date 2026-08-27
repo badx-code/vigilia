@@ -34,7 +34,7 @@ import {
   defaultUsefulContacts,
   defaultCalendarEvents,
 } from '../data/defaultData';
-import { recalculateScheduleWithDelay } from '../utils/timeUtils';
+import { recalculateScheduleWithDelay, getCurrentMomentStatus } from '../utils/timeUtils';
 
 export interface VigilSummary {
   id: string;
@@ -85,6 +85,8 @@ interface VigiliaContextType {
   resetScheduleToOriginal: () => void;
   advanceToNextMoment: () => void;
   rewindToPreviousMoment: () => void;
+  manualActiveMomentIndex: number | null;
+  setManualActiveMomentIndex: (index: number | null) => void;
 
   // Ministers / Team Directory
   ministers: Minister[];
@@ -346,7 +348,7 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Verify server token on mount to prevent localStorage tampering
+  // If token is present, check in background without breaking local offline session
   useEffect(() => {
     if (authToken && userRole === 'dirigente') {
       fetch('/api/auth/verify-session', {
@@ -354,17 +356,13 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })
         .then((r) => r.json())
         .then((res) => {
-          if (!res.valid) {
-            // Expired or invalid token: downgrade to member
-            setUserRole('membro');
+          if (res && res.valid === false) {
+            // Expired token: clear token
             setAuthToken(null);
             localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
           }
         })
         .catch(() => {});
-    } else if (!authToken && userRole === 'dirigente') {
-      // If dirigente role was set without an active session token, downgrade to membro
-      setUserRole('membro');
     }
   }, [authToken, userRole]);
 
@@ -375,6 +373,7 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
   const [simulatedTime, setSimulatedTimeState] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [manualActiveMomentIndex, setManualActiveMomentIndex] = useState<number | null>(null);
 
   // Persist Vigils to Storage and Debounced API Sync
   useEffect(() => {
@@ -988,8 +987,51 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [updateActiveVigil]
   );
 
-  const advanceToNextMoment = useCallback(() => {}, []);
-  const rewindToPreviousMoment = useCallback(() => {}, []);
+  const advanceToNextMoment = useCallback(() => {
+    const sorted = [...moments];
+    if (sorted.length === 0) return;
+
+    let curIdx = manualActiveMomentIndex;
+    if (curIdx === null) {
+      const status = getCurrentMomentStatus(sorted, effectiveTime, config.startTime, config.endTime);
+      curIdx = status.currentIndex >= 0 ? status.currentIndex : 0;
+    }
+
+    if (curIdx < sorted.length - 1) {
+      const nextIdx = curIdx + 1;
+      setManualActiveMomentIndex(nextIdx);
+      // Also adjust time or schedule if appropriate to keep in sync
+      const targetMoment = sorted[nextIdx];
+      if (targetMoment) {
+        setSimulatedTimeState(targetMoment.startTime);
+      }
+    } else {
+      // Reached the end of moments
+      setManualActiveMomentIndex(sorted.length - 1);
+    }
+  }, [moments, manualActiveMomentIndex, effectiveTime, config.startTime, config.endTime]);
+
+  const rewindToPreviousMoment = useCallback(() => {
+    const sorted = [...moments];
+    if (sorted.length === 0) return;
+
+    let curIdx = manualActiveMomentIndex;
+    if (curIdx === null) {
+      const status = getCurrentMomentStatus(sorted, effectiveTime, config.startTime, config.endTime);
+      curIdx = status.currentIndex >= 0 ? status.currentIndex : 0;
+    }
+
+    if (curIdx > 0) {
+      const prevIdx = curIdx - 1;
+      setManualActiveMomentIndex(prevIdx);
+      const targetMoment = sorted[prevIdx];
+      if (targetMoment) {
+        setSimulatedTimeState(targetMoment.startTime);
+      }
+    } else {
+      setManualActiveMomentIndex(0);
+    }
+  }, [moments, manualActiveMomentIndex, effectiveTime, config.startTime, config.endTime]);
 
   // Ministers Directory CRUD
   const addMinister = useCallback(
@@ -1828,6 +1870,8 @@ export const VigiliaProvider: React.FC<{ children: React.ReactNode }> = ({ child
         resetScheduleToOriginal,
         advanceToNextMoment,
         rewindToPreviousMoment,
+        manualActiveMomentIndex,
+        setManualActiveMomentIndex,
         ministers,
         addMinister,
         updateMinister,

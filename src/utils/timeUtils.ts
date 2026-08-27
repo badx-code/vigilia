@@ -138,7 +138,8 @@ export function getCurrentMomentStatus(
   moments: ScheduleMoment[],
   currentTimeStr: string,
   vigilStartTimeStr: string = '21:00',
-  vigilEndTimeStr: string = '05:00'
+  vigilEndTimeStr: string = '05:00',
+  manualActiveIndex?: number | null
 ): CurrentMomentStatus {
   if (!moments || moments.length === 0) {
     return {
@@ -172,6 +173,33 @@ export function getCurrentMomentStatus(
     const nb = normalizeVigilMinutes(timeToMinutes(b.startTime), vigilStartM);
     return na - nb;
   });
+
+  // If a manual active index was explicitly chosen by the dirigente
+  if (typeof manualActiveIndex === 'number' && manualActiveIndex >= 0 && manualActiveIndex < sorted.length) {
+    const active = sorted[manualActiveIndex];
+    const mStart = normalizeVigilMinutes(timeToMinutes(active.startTime), vigilStartM);
+    const mEnd = normalizeVigilMinutes(timeToMinutes(active.endTime), vigilStartM);
+    const totalDurationMinutes = Math.max(1, mEnd - mStart);
+    const next = sorted[manualActiveIndex + 1] || null;
+    const previous = manualActiveIndex > 0 ? sorted[manualActiveIndex - 1] : null;
+    const upcoming: ScheduleMoment[] = [];
+    for (let j = manualActiveIndex + 1; j < Math.min(sorted.length, manualActiveIndex + 4); j++) {
+      upcoming.push(sorted[j]);
+    }
+
+    return {
+      activeMoment: active,
+      nextMoment: next,
+      upcomingMoments: upcoming,
+      previousMoment: previous,
+      progressPercent: 50,
+      minutesRemaining: Math.max(5, Math.round(totalDurationMinutes / 2)),
+      totalDurationMinutes,
+      isBeforeVigil: false,
+      isAfterVigil: false,
+      currentIndex: manualActiveIndex,
+    };
+  }
 
   let activeMoment: ScheduleMoment | null = null;
   let nextMoment: ScheduleMoment | null = null;

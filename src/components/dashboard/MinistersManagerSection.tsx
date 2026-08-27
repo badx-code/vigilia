@@ -16,9 +16,16 @@ import {
   Music,
 } from 'lucide-react';
 import { Minister, MinisterRole } from '../../types';
+import {
+  generateMemberScheduleWhatsAppMessage,
+  openWhatsAppDirect,
+} from '../../utils/whatsappUtils';
+import { MessageCircle } from 'lucide-react';
 
 export const MinistersManagerSection: React.FC = () => {
   const {
+    config,
+    moments,
     ministers,
     addMinister,
     updateMinister,
@@ -189,6 +196,28 @@ export const MinistersManagerSection: React.FC = () => {
 
                 {/* Card Action Buttons */}
                 <div className="flex items-center justify-end gap-1.5 pt-3 border-t border-[#292E36]/60">
+                  <button
+                    onClick={() => {
+                      const myMoments = moments.filter(
+                        (mom) =>
+                          (mom.responsible &&
+                            mom.responsible.toLowerCase().includes(m.name.toLowerCase())) ||
+                          (m.name &&
+                            mom.responsible &&
+                            m.name.toLowerCase().includes(mom.responsible.toLowerCase()))
+                      );
+                      const msg = generateMemberScheduleWhatsAppMessage({
+                        config,
+                        memberName: m.name,
+                        myMoments,
+                      });
+                      openWhatsAppDirect(msg, m.phone);
+                    }}
+                    className="p-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 transition cursor-pointer"
+                    title={`Enviar escala de ${m.name} no WhatsApp`}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => duplicateMinister(m.id)}
                     className="p-2 rounded-lg bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#C9B27C] transition border border-[#292E36]"

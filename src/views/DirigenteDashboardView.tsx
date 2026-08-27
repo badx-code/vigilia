@@ -108,6 +108,7 @@ export const DirigenteDashboardView: React.FC<{
     importDataJSON,
     prayerRequests,
     participants,
+    manualActiveMomentIndex,
   } = useVigilia();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('visao_geral');
@@ -116,8 +117,14 @@ export const DirigenteDashboardView: React.FC<{
 
   // Live Moment Status
   const momentStatus = useMemo(() => {
-    return getCurrentMomentStatus(moments, currentTime, config.startTime, config.endTime);
-  }, [moments, currentTime, config.startTime, config.endTime]);
+    return getCurrentMomentStatus(
+      moments,
+      currentTime,
+      config.startTime,
+      config.endTime,
+      manualActiveMomentIndex
+    );
+  }, [moments, currentTime, config.startTime, config.endTime, manualActiveMomentIndex]);
 
   const { activeMoment, nextMoment, upcomingMoments, progressPercent, minutesRemaining } = momentStatus;
 

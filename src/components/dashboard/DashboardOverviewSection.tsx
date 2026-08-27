@@ -26,6 +26,11 @@ import {
   calculateDurationMinutes,
 } from '../../utils/timeUtils';
 import { generateVigilOfficialPdf } from '../../utils/pdfGenerator';
+import {
+  generateScheduleWhatsAppMessage,
+  openWhatsAppDirect,
+} from '../../utils/whatsappUtils';
+import { MessageCircle } from 'lucide-react';
 
 export const DashboardOverviewSection: React.FC<{
   onOpenProjector: () => void;
@@ -41,9 +46,18 @@ export const DashboardOverviewSection: React.FC<{
     repertoire,
     currentTime,
     advanceToNextMoment,
+    rewindToPreviousMoment,
+    manualActiveMomentIndex,
+    setManualActiveMomentIndex,
   } = useVigilia();
 
-  const momentStatus = getCurrentMomentStatus(moments, currentTime, config.startTime, config.endTime);
+  const momentStatus = getCurrentMomentStatus(
+    moments,
+    currentTime,
+    config.startTime,
+    config.endTime,
+    manualActiveMomentIndex
+  );
   const { activeMoment, nextMoment, progressPercent, minutesRemaining } = momentStatus;
   const totalVigilProgress = calculateTotalVigilProgress(currentTime, config.startTime, config.endTime);
 
@@ -86,6 +100,18 @@ export const DashboardOverviewSection: React.FC<{
 
           {/* Action Hub */}
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => {
+                const msg = generateScheduleWhatsAppMessage({ config, moments });
+                openWhatsAppDirect(msg);
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+              title="Enviar cronograma atualizado no WhatsApp"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>WhatsApp</span>
+            </button>
+
             <button
               onClick={onPreviewPublic}
               className="px-4 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-[#C9B27C]/20 transition cursor-pointer"
@@ -214,18 +240,37 @@ export const DashboardOverviewSection: React.FC<{
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  onClick={rewindToPreviousMoment}
+                  className="px-3 py-2 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] text-xs font-bold transition cursor-pointer"
+                  title="Voltar ao momento anterior"
+                >
+                  ← Anterior
+                </button>
                 <button
                   onClick={advanceToNextMoment}
-                  className="w-full py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-extrabold transition shadow"
+                  className="flex-1 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-extrabold transition shadow cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  Concluir & Avançar para o Próximo →
+                  <span>Concluir & Avançar para o Próximo</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           ) : (
-            <div className="p-4 text-center text-xs text-[#9FA4AD]">
-              Vigília aguardando início ou intervalo programado.
+            <div className="p-4 text-center space-y-3">
+              <p className="text-xs text-[#9FA4AD]">
+                Vigília aguardando início do cronograma.
+              </p>
+              {moments.length > 0 && (
+                <button
+                  onClick={() => setManualActiveMomentIndex(0)}
+                  className="px-4 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold transition shadow cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Iniciar Primeiro Momento: {moments[0].title}</span>
+                </button>
+              )}
             </div>
           )}
         </div>

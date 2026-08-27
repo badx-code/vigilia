@@ -30,6 +30,14 @@ import {
   formatDurationHuman,
 } from '../utils/timeUtils';
 import { PrayerCategory, ScheduleMoment } from '../types';
+import {
+  generateScheduleWhatsAppMessage,
+  generateMemberScheduleWhatsAppMessage,
+  generateNoticeWhatsAppMessage,
+  generatePrayersWhatsAppMessage,
+  openWhatsAppDirect,
+} from '../utils/whatsappUtils';
+import { MessageCircle } from 'lucide-react';
 
 export const MemberView: React.FC<{
   onOpenDirigenteAuth?: () => void;
@@ -45,15 +53,14 @@ export const MemberView: React.FC<{
     incrementPrayer,
     notices,
     currentTime,
-    ministers,
     activeVigilRequiresParticipantPassword,
     isParticipantUnlocked,
     unlockParticipantMode,
+    manualActiveMomentIndex,
   } = useVigilia();
 
-  const [activeTab, setActiveTab] = useState<'agora' | 'minha_escala' | 'programacao' | 'repertorio' | 'oracoes' | 'avisos'>('agora');
+  const [activeTab, setActiveTab] = useState<'agora' | 'programacao' | 'repertorio' | 'oracoes' | 'avisos'>('agora');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMemberName, setSelectedMemberName] = useState<string>('');
   const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
 
   // Participant Password Gateway state
@@ -73,8 +80,14 @@ export const MemberView: React.FC<{
 
   // Time & Status Calculation
   const momentStatus = useMemo(() => {
-    return getCurrentMomentStatus(moments, currentTime, config.startTime, config.endTime);
-  }, [moments, currentTime, config.startTime, config.endTime]);
+    return getCurrentMomentStatus(
+      moments,
+      currentTime,
+      config.startTime,
+      config.endTime,
+      manualActiveMomentIndex
+    );
+  }, [moments, currentTime, config.startTime, config.endTime, manualActiveMomentIndex]);
 
   const { activeMoment, nextMoment, upcomingMoments, progressPercent, minutesRemaining } = momentStatus;
 
@@ -127,34 +140,6 @@ export const MemberView: React.FC<{
   const activeDurationMinutes = activeMoment
     ? calculateDurationMinutes(activeMoment.startTime, activeMoment.endTime, config.startTime)
     : 0;
-
-  // List of all distinct minister and responsible names for quick selection in "Minha Escala"
-  const distinctResponsibleNames = useMemo(() => {
-    const namesSet = new Set<string>();
-    ministers.forEach((m) => {
-      if (m.name) namesSet.add(m.name.trim());
-    });
-    moments.forEach((m) => {
-      if (m.responsible) namesSet.add(m.responsible.trim());
-    });
-    repertoire.forEach((s) => {
-      if (s.responsible) namesSet.add(s.responsible.trim());
-    });
-    return Array.from(namesSet).sort();
-  }, [ministers, moments, repertoire]);
-
-  // "Minha Escala" items
-  const myMoments = useMemo(() => {
-    if (!selectedMemberName.trim()) return [];
-    const term = selectedMemberName.toLowerCase().trim();
-    return moments.filter((m) => m.responsible && m.responsible.toLowerCase().includes(term));
-  }, [moments, selectedMemberName]);
-
-  const mySongs = useMemo(() => {
-    if (!selectedMemberName.trim()) return [];
-    const term = selectedMemberName.toLowerCase().trim();
-    return repertoire.filter((s) => s.responsible && s.responsible.toLowerCase().includes(term));
-  }, [repertoire, selectedMemberName]);
 
   // Filtered Moments for Programação
   const filteredMoments = useMemo(() => {
@@ -323,7 +308,17 @@ export const MemberView: React.FC<{
               <span>{config.churchName || 'Igreja Local'}</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              {onOpenDirigenteAuth && (
+                <button
+                  onClick={onOpenDirigenteAuth}
+                  title="Acesso de Dirigente"
+                  className="px-2.5 py-1 rounded-lg bg-[#14171C] hover:bg-[#1f242d] text-[#C9B27C] border border-[#C9B27C]/30 text-xs font-bold transition flex items-center gap-1"
+                >
+                  <Key className="w-3 h-3" />
+                  <span className="hidden sm:inline">Dirigente</span>
+                </button>
+              )}
               {onLogout && (
                 <button
                   onClick={onLogout}
@@ -410,18 +405,6 @@ export const MemberView: React.FC<{
           >
             <Flame className={`w-3.5 h-3.5 ${activeTab === 'agora' ? 'text-[#0B0D10]' : 'text-rose-400 animate-pulse'}`} />
             🔴 Agora & Próximo
-          </button>
-
-          <button
-            onClick={() => setActiveTab('minha_escala')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-              activeTab === 'minha_escala'
-                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
-                : 'bg-[#14171C] text-[#9FA4AD] hover:bg-[#191D24] border border-[#292E36]'
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-            👤 Minha Escala
           </button>
 
           <button
@@ -632,177 +615,33 @@ export const MemberView: React.FC<{
           </div>
         )}
 
-        {/* ===================== TAB: MINHA ESCALA ===================== */}
-        {activeTab === 'minha_escala' && (
-          <div className="space-y-4 animate-fadeIn">
-            <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 space-y-3 shadow-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#C9B27C]/15 text-[#C9B27C] flex items-center justify-center font-bold">
-                  <User className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-[#F2F2F2]">👤 MINHA ESCALA</h2>
-                  <p className="text-[11px] text-[#9FA4AD]">Selecione ou digite seu nome para ver seus momentos</p>
-                </div>
-              </div>
-
-              {/* Selector or input for name */}
-              <div className="space-y-2 pt-1">
-                <label className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
-                  Escolha seu nome na lista:
-                </label>
-                <select
-                  value={selectedMemberName}
-                  onChange={(e) => setSelectedMemberName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs font-semibold text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C] transition"
-                >
-                  <option value="">-- Selecione seu nome / ministério --</option>
-                  {distinctResponsibleNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="text-center text-[10px] text-[#9FA4AD]">ou digite abaixo para buscar</div>
-
-                <input
-                  type="text"
-                  placeholder="Digite seu nome ou ministério..."
-                  value={selectedMemberName}
-                  onChange={(e) => setSelectedMemberName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] placeholder-[#9FA4AD]/40 focus:outline-none focus:border-[#C9B27C] transition"
-                />
-              </div>
-            </div>
-
-            {/* Results Display */}
-            {selectedMemberName.trim() ? (
-              <div className="space-y-3">
-                <div className="bg-[#14171C] border border-[#C9B27C]/30 rounded-xl p-3 text-xs text-[#C9B27C] font-semibold flex items-center justify-between">
-                  <span>
-                    Você participa de <strong>{myMoments.length + mySongs.length} momento(s)</strong> na vigília:
-                  </span>
-                  <span className="font-mono text-[11px] bg-[#0B0D10] px-2 py-0.5 rounded border border-[#292E36]">
-                    {selectedMemberName}
-                  </span>
-                </div>
-
-                {myMoments.length === 0 && mySongs.length === 0 ? (
-                  <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-8 text-center text-xs text-[#9FA4AD]">
-                    Nenhum momento encontrado para "{selectedMemberName}". Verifique a grafia ou selecione na lista acima.
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {/* Moments in schedule */}
-                    {myMoments.map((mom) => {
-                      const isExpanded = expandedMomentId === mom.id;
-                      const duration = calculateDurationMinutes(mom.startTime, mom.endTime, config.startTime);
-                      return (
-                        <div
-                          key={mom.id}
-                          onClick={() => setExpandedMomentId(isExpanded ? null : mom.id)}
-                          className="rounded-2xl bg-[#14171C] border border-[#292E36] hover:border-[#C9B27C]/40 p-4 transition-all cursor-pointer shadow-md"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3">
-                              <div className="text-center min-w-[55px] bg-[#0B0D10] p-2 rounded-xl border border-[#292E36]">
-                                <span className="font-mono text-xs font-bold text-[#C9B27C] block">
-                                  {mom.startTime}
-                                </span>
-                                <span className="text-[10px] text-[#9FA4AD] block">
-                                  {mom.endTime}
-                                </span>
-                              </div>
-                              <div>
-                                <h3 className="text-sm sm:text-base font-bold text-[#F2F2F2] flex items-center gap-1.5">
-                                  <span>{getMomentTypeIcon(mom.type)}</span>
-                                  <span>{mom.title}</span>
-                                </h3>
-                                <p className="text-xs text-[#9FA4AD] mt-0.5">
-                                  Duração: {formatDurationHuman(duration)}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-[#9FA4AD] p-1">
-                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </div>
-                          </div>
-
-                          {/* Expanded Details */}
-                          {isExpanded && (
-                            <div className="mt-3 pt-3 border-t border-[#292E36] text-xs space-y-2 text-[#9FA4AD] animate-fadeIn">
-                              {mom.description && (
-                                <div>
-                                  <strong className="text-[#F2F2F2] block mb-0.5">Descrição:</strong>
-                                  <p className="bg-[#0B0D10] p-2.5 rounded-lg border border-[#292E36] text-xs leading-relaxed text-[#F2F2F2]">
-                                    {mom.description}
-                                  </p>
-                                </div>
-                              )}
-                              {mom.scripture && (
-                                <div className="flex items-center gap-1.5 text-[#C9B27C]">
-                                  <span>📖 Texto Bíblico:</span>
-                                  <strong>{mom.scripture}</strong>
-                                </div>
-                              )}
-                              <p className="text-[11px] text-[#C9B27C]/80 italic">
-                                * Por favor, esteja pronto 10 minutos antes do seu horário no púlpito/altar.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Songs in repertoire */}
-                    {mySongs.map((song) => (
-                      <div
-                        key={song.id}
-                        className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex items-center justify-between gap-3 shadow-md"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="p-2 rounded-xl bg-[#0B0D10] text-[#C9B27C] border border-[#292E36]">
-                            🎵
-                          </span>
-                          <div>
-                            <h4 className="text-sm font-bold text-[#F2F2F2]">{song.title}</h4>
-                            <p className="text-xs text-[#9FA4AD]">{song.artist || 'Ministério de Louvor'}</p>
-                          </div>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-[#C9B27C] bg-[#0B0D10] px-2.5 py-1 rounded-lg border border-[#292E36]">
-                          Tom {song.key}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-2xl bg-[#14171C]/60 border border-[#292E36] p-8 text-center space-y-2">
-                <User className="w-8 h-8 text-[#C9B27C] mx-auto opacity-80" />
-                <h3 className="text-sm font-bold text-[#F2F2F2]">Consulte seus momentos na Vigília</h3>
-                <p className="text-xs text-[#9FA4AD] max-w-xs mx-auto">
-                  Selecione seu nome na caixa acima para visualizar exclusivamente os horários que você irá ministrar, orar ou cantar.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ===================== TAB: PROGRAMAÇÃO ===================== */}
         {activeTab === 'programacao' && (
           <div className="space-y-4 animate-fadeIn">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-[#9FA4AD] absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscar por momento, responsável ou texto bíblico..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#14171C] border border-[#292E36] text-[#F2F2F2] placeholder-[#9FA4AD]/40 text-xs focus:outline-none focus:border-[#C9B27C] transition"
-              />
+            {/* Search Input & WhatsApp Share */}
+            <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-[#9FA4AD] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar por momento, responsável ou texto bíblico..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#14171C] border border-[#292E36] text-[#F2F2F2] placeholder-[#9FA4AD]/40 text-xs focus:outline-none focus:border-[#C9B27C] transition"
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  const msg = generateScheduleWhatsAppMessage({ config, moments });
+                  openWhatsAppDirect(msg);
+                }}
+                className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition shrink-0 cursor-pointer"
+                title="Compartilhar cronograma completo no WhatsApp"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Enviar no WhatsApp</span>
+              </button>
             </div>
 
             {/* List of Moments */}

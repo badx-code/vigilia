@@ -25,6 +25,12 @@ import {
   addMinutesToTime,
   formatDurationHuman,
 } from '../../utils/timeUtils';
+import {
+  generateScheduleWhatsAppMessage,
+  generateMemberScheduleWhatsAppMessage,
+  openWhatsAppDirect,
+} from '../../utils/whatsappUtils';
+import { Share2, MessageCircle } from 'lucide-react';
 
 export const ScheduleManagerSection: React.FC = () => {
   const {
@@ -152,13 +158,27 @@ export const ScheduleManagerSection: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={handleOpenAdd}
-            className="px-4 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-[#C9B27C]/20 transition cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>ADICIONAR NOVO MOMENTO</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const msg = generateScheduleWhatsAppMessage({ config, moments, delayMinutes });
+                openWhatsAppDirect(msg);
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+              title="Compartilhar cronograma atualizado no WhatsApp"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>📲 Compartilhar no WhatsApp</span>
+            </button>
+
+            <button
+              onClick={handleOpenAdd}
+              className="px-4 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-[#C9B27C]/20 transition cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>ADICIONAR NOVO MOMENTO</span>
+            </button>
+          </div>
         </div>
 
         {/* Delay Recalculation Bar */}
@@ -266,8 +286,25 @@ export const ScheduleManagerSection: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Actions: Reorder, Duplicate, Edit, Delete */}
+                  {/* Actions: WhatsApp Notify, Reorder, Duplicate, Edit, Delete */}
                   <div className="flex items-center gap-1 self-end sm:self-auto shrink-0">
+                    <button
+                      onClick={() => {
+                        const matchedMinister = ministers.find(
+                          (min) => min.name.toLowerCase() === (m.responsible || '').toLowerCase()
+                        );
+                        const msg = generateMemberScheduleWhatsAppMessage({
+                          config,
+                          memberName: m.responsible || 'Irmão(ã)',
+                          myMoments: [m],
+                        });
+                        openWhatsAppDirect(msg, matchedMinister?.phone);
+                      }}
+                      className="p-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 transition cursor-pointer"
+                      title="Enviar notificação deste momento no WhatsApp do responsável"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       disabled={index === 0}
                       onClick={() => moveMoment(m.id, 'up')}
