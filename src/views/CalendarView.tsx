@@ -202,7 +202,7 @@ export const CalendarView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: Vigília Geral, Ensaio de Louvor..."
-                  value={formData.title}
+                  value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -212,7 +212,7 @@ export const CalendarView: React.FC = () => {
                 <div>
                   <label className="block text-xs font-medium text-[#9FA4AD] mb-1">Tipo</label>
                   <select
-                    value={formData.type}
+                    value={formData.type || 'vigilia'}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -233,7 +233,7 @@ export const CalendarView: React.FC = () => {
                   <input
                     type="date"
                     required
-                    value={formData.date}
+                    value={formData.date || ''}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -246,7 +246,7 @@ export const CalendarView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="21:00 – 05:00"
-                    value={formData.time}
+                    value={formData.time || ''}
                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -257,7 +257,7 @@ export const CalendarView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Ex: Templo Principal"
-                    value={formData.location}
+                    value={formData.location || ''}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -269,7 +269,7 @@ export const CalendarView: React.FC = () => {
                 <textarea
                   rows={2}
                   placeholder="Informações adicionais para a equipe..."
-                  value={formData.notes}
+                  value={formData.notes || ''}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none resize-none"
                 />

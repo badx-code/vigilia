@@ -1,0 +1,503 @@
+{
+  "allVigils": [
+    {
+      "id": "vigil-default-1",
+      "code": "fer1234",
+      "createdAt": "2026-08-27T00:17:33.506Z",
+      "delayMinutes": 0,
+      "config": {
+        "accessCode": "fer1234",
+        "memberCode": "fer1234",
+        "dirigenteCode": "fer184426",
+        "adminCode": "fer184426",
+        "dirigentePin": "fer184426",
+        "requireParticipantPassword": false,
+        "vigilName": "Pregação do Evangelho",
+        "churchName": "Iasd Fertilidade",
+        "ministryName": "",
+        "theme": "Pregação do Evangelho",
+        "subtheme": "Buscando a Presença e o Poder de Deus até o Amanhecer",
+        "date": "2026-08-29",
+        "startTime": "21:00",
+        "endTime": "05:00",
+        "location": "Fertilidade/Iasd Fertilidade",
+        "address": "",
+        "city": "Palmares",
+        "state": "PE",
+        "description": "Uma noite inesquecível de comunhão, oração intercessória, ministração da Palavra de Deus e louvor congregacional.",
+        "presentationText": "Seja muito bem-vindo à nossa vigília de oração. Uma noite consagrada para buscar ao Senhor de todo o coração.",
+        "keyVerse": "Clama a mim, e responder-te-ei, e anunciar-te-ei coisas grandes e firmes que não sabes.",
+        "verseReference": "Jeremias 33:3",
+        "churchLogo": "",
+        "vigilBanner": "",
+        "mainImage": "",
+        "accentColor": "#C9B27C",
+        "secondaryColor": "#14171C",
+        "contactPhone": "(11) 98765-4321",
+        "whatsapp": "(11) 98765-4321",
+        "instagram": "@vigiliadeoracao",
+        "youtube": "https://youtube.com/@vigiliacentral",
+        "liveStreamUrl": "",
+        "mapUrl": "https://maps.google.com",
+        "additionalInfo": "Traga sua Bíblia e convide seus amigos e familiares. Teremos momento especial de comunhão e café da madrugada com todos os irmãos.",
+        "dirigenteProfile": {
+          "fullName": "Pb. André Souza",
+          "displayName": "Pb. André",
+          "roleTitle": "Dirigente Geral e Coordenador de Vigílias",
+          "phone": "(11) 97333-4455",
+          "whatsapp": "(11) 97333-4455",
+          "email": "andre.souza@igreja.org",
+          "bio": "Servo de Deus dedicado à oração, avivamento espiritual e discipulado."
+        }
+      },
+      "moments": [
+        {
+          "id": "mom-1",
+          "startTime": "21:00",
+          "endTime": "21:30",
+          "durationMinutes": 30,
+          "title": "Recepção, Oração Inicial & Boas-Vindas",
+          "type": "abertura",
+          "responsible": "Pb. André Souza",
+          "responsibleRole": "Dirigente",
+          "location": "Templo Central",
+          "description": "Acolhimento da igreja, oração de consagração e leitura bíblica inicial.",
+          "subitems": [
+            "Acolhimento na entrada",
+            "Oração pastoral inicial",
+            "Apresentação dos visitantes"
+          ],
+          "status": "concluido"
+        },
+        {
+          "id": "mom-2",
+          "startTime": "21:30",
+          "endTime": "22:15",
+          "durationMinutes": 45,
+          "title": "Primeiro Bloco de Louvor & Adoração Congregacional",
+          "type": "louvor",
+          "responsible": "Ministério Adoração Viva",
+          "responsibleRole": "Ministro de Louvor",
+          "location": "Altar",
+          "description": "Cânticos espirituais de exaltação, gratidão e entrega ao Senhor.",
+          "subitems": [
+            "Porque Ele Vive",
+            "Bondade de Deus",
+            "Vitorioso És"
+          ],
+          "status": "em_andamento"
+        },
+        {
+          "id": "mom-3",
+          "startTime": "22:15",
+          "endTime": "23:00",
+          "durationMinutes": 45,
+          "title": "Primeira Ministração da Palavra de Deus",
+          "type": "palavra",
+          "responsible": "Pr. Carlos Eduardo",
+          "responsibleRole": "Pastor Titular",
+          "location": "Púlpito",
+          "description": "Mensagem inspirada sobre o poder da fé e a busca pelo Espírito Santo.",
+          "subitems": [
+            "Leitura de Jeremias 33:3",
+            "Exposição das Escrituras",
+            "Apelo e reflexão"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-4",
+          "startTime": "23:00",
+          "endTime": "23:45",
+          "durationMinutes": 45,
+          "title": "Clamor de Joelhos pelas Famílias & Causas Impossíveis",
+          "type": "clamor",
+          "responsible": "Equipe de Intercessão",
+          "responsibleRole": "Intercessores",
+          "location": "Templo",
+          "description": "Oração fervorosa de joelhos por restauração de lares e libertação.",
+          "subitems": [
+            "Oração pelos filhos e jovens",
+            "Clamor pela saúde dos enfermos",
+            "Intercessão pela igreja"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-5",
+          "startTime": "23:45",
+          "endTime": "00:30",
+          "durationMinutes": 45,
+          "title": "Louvor Especial & Testemunhos de Vitória",
+          "type": "testemunho",
+          "responsible": "Sarah Beatriz & Davi",
+          "responsibleRole": "Cantora & Testemunho",
+          "location": "Altar",
+          "description": "Cântico de adoração e testemunhos de curas e respostas de oração.",
+          "subitems": [
+            "Louvor: A Bênção",
+            "Testemunho de Cura",
+            "Oração de Ação de Graças"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-6",
+          "startTime": "00:30",
+          "endTime": "01:30",
+          "durationMinutes": 60,
+          "title": "Segunda Ministração da Palavra & Unção",
+          "type": "palavra",
+          "responsible": "Pr. Marcos Silveira",
+          "responsibleRole": "Pregador Convidado",
+          "location": "Púlpito",
+          "description": "Mensagem profética para a madrugada e ministração com imposição de mãos.",
+          "subitems": [
+            "Pregação da Palavra",
+            "Oração pelos que buscam avivamento",
+            "Momento de Unção"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-7",
+          "startTime": "01:30",
+          "endTime": "02:40",
+          "durationMinutes": 70,
+          "title": "Intercessão Profética & Clamor pelos Pedidos do Altar",
+          "type": "oracao",
+          "responsible": "Diác. Lucas Oliveira & Pb. André",
+          "responsibleRole": "Dirigentes",
+          "location": "Altar",
+          "description": "Oração nominal pelos pedidos deixados pelos irmãos no aplicativo e na urna.",
+          "subitems": [
+            "Apresentação dos pedidos",
+            "Oração em duplas",
+            "Clamor pela nação"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-8",
+          "startTime": "02:40",
+          "endTime": "03:20",
+          "durationMinutes": 40,
+          "title": "Intervalo da Madrugada & Café da Comunhão (Ágape)",
+          "type": "intervalo",
+          "responsible": "Equipe de Recepção & Café",
+          "responsibleRole": "Diaconato",
+          "location": "Salão Social",
+          "description": "Momento fraterno de comunhão, café quente e renovação de energias.",
+          "subitems": [
+            "Café e lanche",
+            "Comunhão entre os irmãos",
+            "Troca de experiências"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-9",
+          "startTime": "03:20",
+          "endTime": "04:15",
+          "durationMinutes": 55,
+          "title": "Louvor da Madrugada & Vigília de Ações de Graças",
+          "type": "louvor",
+          "responsible": "Ministério Jovem",
+          "responsibleRole": "Louvor Jovem",
+          "location": "Altar",
+          "description": "Celebração com cânticos de júbilo e avivamento espiritual na reta final.",
+          "subitems": [
+            "Quero Conhecer Jesus",
+            "Vim Para Adorar-Te",
+            "Em Teus Braços"
+          ],
+          "status": "pendente"
+        },
+        {
+          "id": "mom-10",
+          "startTime": "04:15",
+          "endTime": "05:00",
+          "durationMinutes": 45,
+          "title": "Clamor do Amanhecer, Santa Ceia & Bênção Apostólica",
+          "type": "encerramento",
+          "responsible": "Pr. Carlos Eduardo & Pb. André",
+          "responsibleRole": "Pastores",
+          "location": "Altar",
+          "description": "Ceia memorial da aliança, última oração de entrega e bênção pastoral.",
+          "subitems": [
+            "Santa Ceia do Senhor",
+            "Oração de consagração das famílias",
+            "Bênção apostólica"
+          ],
+          "status": "pendente"
+        }
+      ],
+      "ministers": [
+        {
+          "id": "min-1",
+          "name": "Pr. Carlos Eduardo",
+          "displayName": "Pr. Carlos",
+          "role": "Pastor",
+          "phone": "(11) 98765-4321",
+          "active": true,
+          "notes": "Pregador da Primeira Palavra"
+        },
+        {
+          "id": "min-2",
+          "name": "Pr. Marcos Silveira",
+          "displayName": "Pr. Marcos",
+          "role": "Pregador",
+          "phone": "(11) 98111-2233",
+          "active": true,
+          "notes": "Ministração da Segunda Palavra"
+        },
+        {
+          "id": "min-3",
+          "name": "Pb. André Souza",
+          "displayName": "Pb. André",
+          "role": "Dirigente",
+          "phone": "(11) 97333-4455",
+          "active": true,
+          "notes": "Coordenação Geral e Abertura"
+        },
+        {
+          "id": "min-4",
+          "name": "Diác. Lucas Oliveira",
+          "displayName": "Diác. Lucas",
+          "role": "Dirigente",
+          "phone": "(11) 96555-6677",
+          "active": true,
+          "notes": "Dirigente do Bloco da Madrugada"
+        },
+        {
+          "id": "min-5",
+          "name": "Sarah Beatriz",
+          "displayName": "Sarah",
+          "role": "Cantor",
+          "phone": "(11) 95777-8899",
+          "active": true,
+          "notes": "Solo no Louvor Especial"
+        },
+        {
+          "id": "min-6",
+          "name": "Ministério Adoração Viva",
+          "displayName": "Banda Adoração Viva",
+          "role": "Músico",
+          "active": true,
+          "notes": "Banda principal - Louvor 1"
+        }
+      ],
+      "repertoire": [
+        {
+          "id": "song-1",
+          "title": "Porque Ele Vive",
+          "artist": "Harpa Cristã / Tradicional",
+          "key": "G",
+          "responsible": "Ministério Adoração Viva",
+          "momentTitle": "Louvor e Adoração",
+          "order": 1
+        },
+        {
+          "id": "song-2",
+          "title": "Bondade de Deus",
+          "artist": "Bethel / Isaías Saad",
+          "key": "C",
+          "responsible": "Sarah Beatriz",
+          "momentTitle": "Louvor e Adoração",
+          "order": 2
+        },
+        {
+          "id": "song-3",
+          "title": "Vitorioso És",
+          "artist": "Gabriel Guedes",
+          "key": "Em",
+          "responsible": "Ministério Adoração Viva",
+          "momentTitle": "Louvor e Adoração",
+          "order": 3
+        },
+        {
+          "id": "song-4",
+          "title": "A Bênção",
+          "artist": "Kari Jobe / Gabriel Guedes",
+          "key": "B",
+          "responsible": "Sarah Beatriz",
+          "momentTitle": "Louvor Especial",
+          "order": 4
+        },
+        {
+          "id": "song-5",
+          "title": "Quero Conhecer Jesus",
+          "artist": "Alessandro Vilas Boas",
+          "key": "G",
+          "responsible": "Ministério Jovem",
+          "momentTitle": "Louvor Jovem",
+          "order": 5
+        }
+      ],
+      "checklist": [
+        {
+          "id": "chk-1",
+          "text": "Programação finalizada e revisada",
+          "done": true
+        },
+        {
+          "id": "chk-2",
+          "text": "Pregadores e dirigentes confirmados",
+          "done": true
+        },
+        {
+          "id": "chk-3",
+          "text": "Repertório de louvor alinhado com os ministros",
+          "done": true
+        },
+        {
+          "id": "chk-4",
+          "text": "Som, microfones e projeção testados",
+          "done": true
+        },
+        {
+          "id": "chk-5",
+          "text": "Café da comunhão e lanche organizados",
+          "done": true
+        },
+        {
+          "id": "chk-6",
+          "text": "Código de acesso da vigília compartilhado com a igreja",
+          "done": true
+        }
+      ],
+      "teams": [],
+      "participants": [
+        {
+          "id": "part-1",
+          "name": "Pb. André Souza",
+          "phone": "(11) 97333-4455",
+          "church": "Igreja Central",
+          "city": "São Paulo",
+          "state": "SP",
+          "status": "presente",
+          "registeredAt": "20:45"
+        },
+        {
+          "id": "part-2",
+          "name": "Irmã Helena Matos",
+          "phone": "(11) 92444-5566",
+          "church": "Igreja Central",
+          "city": "São Paulo",
+          "state": "SP",
+          "status": "presente",
+          "registeredAt": "20:50"
+        },
+        {
+          "id": "part-3",
+          "name": "Gabriel Santos",
+          "phone": "(11) 91122-3344",
+          "church": "Igreja Avivamento",
+          "city": "São Paulo",
+          "state": "SP",
+          "status": "confirmado",
+          "registeredAt": "20:55"
+        }
+      ],
+      "prayerRequests": [
+        {
+          "id": "pray-1",
+          "authorName": "Irmã Maria de Fátima",
+          "request": "Pela restauração e salvação de toda a minha família e libertação do meu filho.",
+          "category": "familia",
+          "prayersCount": 14,
+          "createdAt": "21:05",
+          "status": "aprovado",
+          "userPrayed": false
+        },
+        {
+          "id": "pray-2",
+          "authorName": "Irmão Carlos Eduardo",
+          "request": "Por uma porta de emprego e direção de Deus para um concurso público.",
+          "category": "causas_urgentes",
+          "prayersCount": 9,
+          "createdAt": "21:18",
+          "status": "aprovado"
+        },
+        {
+          "id": "pray-3",
+          "authorName": "Anônimo",
+          "request": "Por cura física e renovo espiritual nesta noite de vigília.",
+          "category": "saude",
+          "prayersCount": 21,
+          "createdAt": "21:30",
+          "status": "aprovado"
+        }
+      ],
+      "notices": [
+        {
+          "id": "not-1",
+          "title": "Café da Comunhão às 02:40",
+          "content": "Teremos um momento especial de confraternização com café quente e lanche para todos.",
+          "type": "info",
+          "createdAt": "21:00",
+          "priority": "alta"
+        },
+        {
+          "id": "not-2",
+          "title": "Urna de Orações no Altar",
+          "content": "Você pode depositar seus pedidos de oração físicos na urna ou enviar pelo aplicativo em tempo real.",
+          "type": "alerta",
+          "createdAt": "21:00",
+          "priority": "media"
+        }
+      ],
+      "usefulContacts": [],
+      "calendarEvents": []
+    }
+  ],
+  "activeVigilId": "vigil-default-1",
+  "templates": [
+    {
+      "id": "tpl-1",
+      "name": "Vigília Tradicional (8 Horas)",
+      "description": "Estrutura completa com 2 ministrações, blocos de louvor, oração e comunhão.",
+      "category": "tradicional",
+      "isCustom": false,
+      "config": {
+        "vigilName": "Grande Vigília de Oração e Louvor",
+        "theme": "Uma noite de busca espiritual, cura e avivamento",
+        "startTime": "21:00",
+        "endTime": "05:00",
+        "keyVerse": "Clama a mim, e responder-te-ei, e anunciar-te-ei coisas grandes e firmes que não sabes.",
+        "verseReference": "Jeremias 33:3"
+      }
+    },
+    {
+      "id": "tpl-2",
+      "name": "Vigília Jovem / Impacto (6 Horas)",
+      "description": "Focada em louvor congregacional dinâmico, testemunhos e oração pelos jovens.",
+      "category": "jovem",
+      "isCustom": false,
+      "config": {
+        "vigilName": "Vigília da Juventude - Avivamento",
+        "theme": "Geração que busca a face de Deus",
+        "startTime": "22:00",
+        "endTime": "04:00",
+        "keyVerse": "Ninguém despreze a tua mocidade; mas sê o exemplo dos fiéis.",
+        "verseReference": "1 Timóteo 4:12"
+      }
+    },
+    {
+      "id": "tpl-3",
+      "name": "Vigília de Clamor & Intercessão (7 Horas)",
+      "description": "Foco profundo em oração de joelhos, intercessão por famílias e causas urgentes.",
+      "category": "intercessao",
+      "isCustom": false,
+      "config": {
+        "vigilName": "Vigília de Clamor e Quebra de Cadeias",
+        "theme": "O poder da oração que prevalece",
+        "startTime": "21:30",
+        "endTime": "04:30",
+        "keyVerse": "Muito pode, por sua eficácia, a súplica do justo.",
+        "verseReference": "Tiago 5:16"
+      }
+    }
+  ],
+  "updatedAt": "2026-08-27T00:56:08.293Z"
+}

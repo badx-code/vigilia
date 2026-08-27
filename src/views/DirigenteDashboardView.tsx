@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Clock,
   Music,
@@ -6,7 +6,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Copy,
   ChevronRight,
   Tv,
   Share2,
@@ -20,6 +19,7 @@ import {
   CheckCircle2,
   LogOut,
   Shield,
+  Church,
   FileText,
   Sliders,
   Settings,
@@ -45,217 +45,74 @@ import {
   MoreVertical,
   Lock,
   Link2,
-  AlertCircle,
+  Layout,
+  UserCheck,
+  Eye,
+  X,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { useVigilia } from '../context/VigiliaContext';
 import {
   getCurrentMomentStatus,
-  formatFullDate,
   calculateDurationMinutes,
   calculateTotalVigilProgress,
   getVigilDelayStatus,
   formatDurationHuman,
   addMinutesToTime,
 } from '../utils/timeUtils';
-import { ScheduleMoment, RepertoireSong, MomentType, Minister, MinisterRole, Participant } from '../types';
 import { generateVigilOfficialPdf } from '../utils/pdfGenerator';
+import { DashboardOverviewSection } from '../components/dashboard/DashboardOverviewSection';
+import { VigilSettingsSection } from '../components/dashboard/VigilSettingsSection';
+import { DirigenteProfileSection } from '../components/dashboard/DirigenteProfileSection';
+import { ScheduleManagerSection } from '../components/dashboard/ScheduleManagerSection';
+import { MinistersManagerSection } from '../components/dashboard/MinistersManagerSection';
+import { ParticipantsManagerSection } from '../components/dashboard/ParticipantsManagerSection';
+import { PrayersNoticesSection } from '../components/dashboard/PrayersNoticesSection';
+import { RepertoireManagerSection } from '../components/dashboard/RepertoireManagerSection';
+import { LoginPageCustomizerSection } from '../components/dashboard/LoginPageCustomizerSection';
+import { SecurityAccessSection } from '../components/dashboard/SecurityAccessSection';
+import { MemberView } from './MemberView';
+
+export type DashboardTab =
+  | 'visao_geral'
+  | 'cronograma'
+  | 'vigilia'
+  | 'dirigente'
+  | 'equipe'
+  | 'participantes'
+  | 'oracoes_avisos'
+  | 'repertorio'
+  | 'login_personalizacao'
+  | 'seguranca';
 
 export const DirigenteDashboardView: React.FC<{
   onOpenProjector: () => void;
   onLogout: () => void;
-}> = ({ onOpenProjector, onLogout }) => {
+  onOpenMemberView?: () => void;
+}> = ({ onOpenProjector, onLogout, onOpenMemberView }) => {
   const {
     config,
-    updateConfig,
     moments,
-    addMoment,
-    updateMoment,
-    deleteMoment,
-    duplicateMoment,
-    reorderMoments,
     ministers,
-    addMinister,
-    updateMinister,
-    deleteMinister,
     repertoire,
-    addSong,
-    updateSong,
-    deleteSong,
-    duplicateSong,
-    reorderSongs,
     checklist,
     toggleChecklist,
     addChecklistItem,
     removeChecklistItem,
     delayMinutes,
     adjustDelay,
-    recalculateScheduleTimes,
     resetScheduleToOriginal,
     advanceToNextMoment,
     rewindToPreviousMoment,
     currentTime,
-    notices,
-    addNotice,
-    deleteNotice,
-    participants,
-    updateParticipantStatus,
-    deleteParticipant,
-    addParticipant,
-    prayerRequests,
-    approvePrayerRequest,
-    rejectPrayerRequest,
     exportDataJSON,
     importDataJSON,
-    updateCustomCode,
+    prayerRequests,
+    participants,
   } = useVigilia();
 
-  const [activeTab, setActiveTab] = useState<'cronograma' | 'repertorio' | 'equipe' | 'pulpito' | 'configuracoes'>('cronograma');
-
-  // Copy feedback state
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyToClipboard = (text: string, keyName: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(keyName);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  // QR Code Fullscreen Modal
-  const [showQrModal, setShowQrModal] = useState(false);
-
-  // Edit Access Code Modal & Confirmation States
-  const [showEditCodeModal, setShowEditCodeModal] = useState(false);
-  const [editingCodeType, setEditingCodeType] = useState<'dirigente' | 'membro' | null>(null);
-  const [newCustomCodeInput, setNewCustomCodeInput] = useState('');
-  const [editCodeStep, setEditCodeStep] = useState<'input' | 'confirm'>('input');
-  const [editCodeError, setEditCodeError] = useState('');
-  const [editCodeSuccess, setEditCodeSuccess] = useState('');
-
-  const handleOpenEditCode = (type: 'dirigente' | 'membro') => {
-    setEditingCodeType(type);
-    setNewCustomCodeInput(
-      type === 'dirigente'
-        ? (config.dirigenteCode || 'DIR-7391')
-        : (config.memberCode || config.accessCode || 'VIG-4827')
-    );
-    setEditCodeStep('input');
-    setEditCodeError('');
-    setEditCodeSuccess('');
-    setShowEditCodeModal(true);
-  };
-
-  const handleProceedToConfirmCode = (e: React.FormEvent) => {
-    e.preventDefault();
-    setEditCodeError('');
-    const clean = newCustomCodeInput.trim().toUpperCase();
-
-    if (!clean) {
-      setEditCodeError('O código não pode ficar em branco.');
-      return;
-    }
-    if (clean.length < 3) {
-      setEditCodeError('O código deve conter no mínimo 3 caracteres.');
-      return;
-    }
-    if (clean.length > 25) {
-      setEditCodeError('O código deve conter no máximo 25 caracteres.');
-      return;
-    }
-    if (!/^[A-Z0-9_-]+$/.test(clean)) {
-      setEditCodeError('Use apenas letras, números, hífen (-) ou sublinhado (_).');
-      return;
-    }
-
-    const currentDirCode = (config.dirigenteCode || '').toUpperCase();
-    const currentMemCode = (config.memberCode || config.accessCode || '').toUpperCase();
-
-    if (editingCodeType === 'dirigente' && clean === currentMemCode) {
-      setEditCodeError('O código do dirigente não pode ser idêntico ao código público dos membros.');
-      return;
-    }
-    if (editingCodeType === 'membro' && clean === currentDirCode) {
-      setEditCodeError('O código do membro não pode ser idêntico ao código privado do dirigente.');
-      return;
-    }
-
-    setEditCodeStep('confirm');
-  };
-
-  const handleExecuteSaveNewCode = () => {
-    if (!editingCodeType) return;
-    const res = updateCustomCode(editingCodeType, newCustomCodeInput);
-    if (res.success) {
-      setEditCodeSuccess(res.message || 'Código alterado com sucesso!');
-      setTimeout(() => {
-        setShowEditCodeModal(false);
-        setEditCodeSuccess('');
-        setEditCodeStep('input');
-      }, 1200);
-    } else {
-      setEditCodeError(res.message || 'Erro ao alterar o código.');
-      setEditCodeStep('input');
-    }
-  };
-
-  // Moment Add/Edit Modal
-  const [showMomentModal, setShowMomentModal] = useState(false);
-  const [editingMomentId, setEditingMomentId] = useState<string | null>(null);
-  const [momentForm, setMomentForm] = useState<Partial<ScheduleMoment>>({
-    title: '',
-    type: 'oracao',
-    startTime: '21:00',
-    endTime: '21:30',
-    responsible: '',
-    description: '',
-    scripture: '',
-    useSlide: false,
-    slideNotes: '',
-    prayerMotives: '',
-    sermonTopic: '',
-    dynamicNotes: '',
-    songsList: '',
-  });
-
-  // Song Add/Edit Modal
-  const [showSongModal, setShowSongModal] = useState(false);
-  const [editingSongId, setEditingSongId] = useState<string | null>(null);
-  const [songForm, setSongForm] = useState<Partial<RepertoireSong>>({
-    title: '',
-    artist: '',
-    key: 'G',
-    responsible: '',
-    momentTitle: '',
-    notes: '',
-  });
-
-  // Minister Add/Edit Modal
-  const [showMinisterModal, setShowMinisterModal] = useState(false);
-  const [editingMinisterId, setEditingMinisterId] = useState<string | null>(null);
-  const [ministerForm, setMinisterForm] = useState<Partial<Minister>>({
-    name: '',
-    role: 'Pastor',
-    phone: '',
-    notes: '',
-  });
-
-  // Notice Add Form
-  const [noticeTitle, setNoticeTitle] = useState('');
-  const [noticeContent, setNoticeContent] = useState('');
-  const [noticeIsUrgent, setNoticeIsUrgent] = useState(false);
-
-  // Participant Add Form
-  const [newParticipantName, setNewParticipantName] = useState('');
-  const [newParticipantPhone, setNewParticipantPhone] = useState('');
-
-  // General Settings Form
-  const [settingsForm, setSettingsForm] = useState({ ...config });
-  const [settingsSaved, setSettingsSaved] = useState(false);
-
-  // State for expanded moment in schedule list (click to see full details)
-  const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
-
-  // Search in schedule
-  const [scheduleSearch, setScheduleSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('visao_geral');
+  const [showPublicPreviewModal, setShowPublicPreviewModal] = useState(false);
+  const [newChecklistText, setNewChecklistText] = useState('');
 
   // Live Moment Status
   const momentStatus = useMemo(() => {
@@ -263,305 +120,102 @@ export const DirigenteDashboardView: React.FC<{
   }, [moments, currentTime, config.startTime, config.endTime]);
 
   const { activeMoment, nextMoment, upcomingMoments, progressPercent, minutesRemaining } = momentStatus;
-  const thirdMoment = upcomingMoments.length > 0 ? upcomingMoments[0] : null;
-
-  // Total Vigil Progress
-  const totalProgress = useMemo(() => {
-    return calculateTotalVigilProgress(currentTime, config.startTime, config.endTime);
-  }, [currentTime, config.startTime, config.endTime]);
 
   // Delay Status Helper
   const delayStatus = useMemo(() => {
     return getVigilDelayStatus(delayMinutes);
   }, [delayMinutes]);
 
-  // Recalculated vigil end forecast when delayed
-  const recalculatedEndTime = useMemo(() => {
-    if (delayMinutes === 0) return config.endTime;
-    return addMinutesToTime(config.endTime, delayMinutes);
-  }, [config.endTime, delayMinutes]);
-
-  // Filtered Moments
-  const filteredMoments = useMemo(() => {
-    if (!scheduleSearch.trim()) return moments;
-    const term = scheduleSearch.toLowerCase();
-    return moments.filter(
-      (m) =>
-        m.title.toLowerCase().includes(term) ||
-        (m.responsible && m.responsible.toLowerCase().includes(term)) ||
-        (m.description && m.description.toLowerCase().includes(term))
-    );
-  }, [moments, scheduleSearch]);
-
-  // Moments Handlers
-  const handleOpenNewMoment = () => {
-    setEditingMomentId(null);
-    const lastMoment = moments[moments.length - 1];
-    const newStart = lastMoment ? lastMoment.endTime : currentTime;
-    const newEnd = addMinutesToTime(newStart, 20);
-
-    setMomentForm({
-      title: '',
-      type: 'oracao',
-      startTime: newStart,
-      endTime: newEnd,
-      responsible: ministers[0]?.name || '',
-      description: '',
-      scripture: '',
-      useSlide: false,
-      slideNotes: '',
-      prayerMotives: '',
-      sermonTopic: '',
-      dynamicNotes: '',
-      songsList: '',
-    });
-    setShowMomentModal(true);
-  };
-
-  const handleEditMoment = (m: ScheduleMoment) => {
-    setEditingMomentId(m.id);
-    setMomentForm({ ...m });
-    setShowMomentModal(true);
-  };
-
-  const handleSaveMoment = (e: React.FormEvent) => {
+  const handleAddChecklist = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!momentForm.title || !momentForm.startTime || !momentForm.endTime) return;
-
-    if (editingMomentId) {
-      updateMoment(editingMomentId, momentForm);
-    } else {
-      addMoment(momentForm as Omit<ScheduleMoment, 'id'>);
-    }
-    setShowMomentModal(false);
+    if (!newChecklistText.trim()) return;
+    addChecklistItem(newChecklistText.trim());
+    setNewChecklistText('');
   };
 
-  // Repertoire Handlers
-  const handleOpenNewSong = () => {
-    setEditingSongId(null);
-    setSongForm({
-      title: '',
-      artist: '',
-      key: 'G',
-      responsible: ministers.find((m) => m.role === 'Cantor' || m.role === 'Músico')?.name || '',
-      momentTitle: '',
-      notes: '',
-    });
-    setShowSongModal(true);
-  };
-
-  const handleEditSong = (s: RepertoireSong) => {
-    setEditingSongId(s.id);
-    setSongForm({ ...s });
-    setShowSongModal(true);
-  };
-
-  const handleSaveSong = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!songForm.title) return;
-
-    if (editingSongId) {
-      updateSong(editingSongId, songForm);
-    } else {
-      addSong(songForm);
-    }
-    setShowSongModal(false);
-  };
-
-  // Minister Handlers
-  const handleOpenNewMinister = () => {
-    setEditingMinisterId(null);
-    setMinisterForm({
-      name: '',
-      role: 'Pastor',
-      phone: '',
-      notes: '',
-    });
-    setShowMinisterModal(true);
-  };
-
-  const handleEditMinister = (min: Minister) => {
-    setEditingMinisterId(min.id);
-    setMinisterForm({ ...min });
-    setShowMinisterModal(true);
-  };
-
-  const handleSaveMinister = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ministerForm.name) return;
-
-    if (editingMinisterId) {
-      updateMinister(editingMinisterId, ministerForm);
-    } else {
-      addMinister(ministerForm as Omit<Minister, 'id'>);
-    }
-    setShowMinisterModal(false);
-  };
-
-  // Add Notice Handler
-  const handleAddNotice = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!noticeTitle.trim() || !noticeContent.trim()) return;
-
-    addNotice({
-      title: noticeTitle.trim(),
-      content: noticeContent.trim(),
-      isUrgent: noticeIsUrgent,
-      category: 'pulpito',
-    });
-
-    setNoticeTitle('');
-    setNoticeContent('');
-    setNoticeIsUrgent(false);
-  };
-
-  // Add Participant Handler
-  const handleAddParticipant = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newParticipantName.trim()) return;
-
-    addParticipant({
-      name: newParticipantName.trim(),
-      phone: newParticipantPhone.trim(),
-      status: 'confirmado',
-    });
-
-    setNewParticipantName('');
-    setNewParticipantPhone('');
-  };
-
-  // Save Settings Handler
-  const handleSaveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateConfig(settingsForm);
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 2000);
-  };
-
-  const memberLink = typeof window !== 'undefined' ? `${window.location.origin}` : '';
-
-  const getWhatsAppShareText = () => {
-    return (
-      `⛪ *${config.churchName || 'Igreja Local'}*\n` +
-      `🌙 *${config.vigilName || 'Vigília de Oração'}*\n` +
-      (config.theme ? `Tema: _"${config.theme}"_\n` : '') +
-      `📅 Data: ${formatFullDate(config.date)}\n` +
-      `⏰ Horário: ${config.startTime} às ${config.endTime}\n` +
-      `🔑 Código de Acesso: *${config.memberCode || config.accessCode}*\n\n` +
-      `Acompanhe a programação, momentos e louvores em tempo real pelo link:\n${memberLink}`
-    );
-  };
-
-  const handleWhatsAppShare = () => {
-    const text = encodeURIComponent(getWhatsAppShareText());
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-  };
-
-  const getMomentTypeIcon = (type: string) => {
-    switch (type) {
-      case 'louvor':
-      case 'louvor_especial':
-        return '🎵';
-      case 'oracao':
-      case 'intercessao':
-        return '🙏';
-      case 'pregacao':
-        return '📖';
-      case 'testemunho':
-        return '💬';
-      case 'dinamica':
-        return '👥';
-      case 'ceia':
-        return '🍞';
-      case 'pausa':
-        return '☕';
-      default:
-        return '✨';
-    }
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        const success = importDataJSON(content);
+        if (success) {
+          alert('Dados da vigília importados com sucesso!');
+        } else {
+          alert('Arquivo de backup inválido.');
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
-    <div id="dirigente-root" className="min-h-screen bg-[#0B0D10] text-[#F2F2F2] font-sans selection:bg-[#C9B27C]/30 pb-20">
-      {/* ===================== TOP HEADER & STATUS BAR ===================== */}
-      <header className="sticky top-0 z-40 bg-[#14171C]/95 backdrop-blur-md border-b border-[#292E36] px-4 py-3 shadow-lg">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Brand & Vigil Title */}
+    <div className="min-h-screen bg-[#0B0D10] text-[#F2F2F2] flex flex-col selection:bg-[#C9B27C]/30 pb-16">
+      {/* ===================== TOP HEADER BAR ===================== */}
+      <header className="bg-[#14171C] border-b border-[#292E36] sticky top-0 z-40 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-3">
+            {/* Title & Church Identity */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#C9B27C]/20 border border-[#C9B27C]/40 text-[#C9B27C] flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-2xl bg-[#C9B27C]/10 border border-[#C9B27C]/30 flex items-center justify-center text-[#C9B27C] shrink-0">
                 <Shield className="w-5 h-5" />
               </div>
+
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-base sm:text-lg font-bold text-[#F2F2F2] font-serif line-clamp-1">
-                    {config.vigilName || 'Painel do Dirigente'}
+                  <h1 className="text-sm sm:text-base font-extrabold text-[#F2F2F2] truncate max-w-[200px] sm:max-w-md">
+                    {config.vigilName}
                   </h1>
-                  <span className="px-2 py-0.5 rounded-full bg-[#0B0D10] border border-[#292E36] text-[10px] font-mono text-[#C9B27C]">
-                    {config.dirigenteCode || 'DIR-7391'}
+                  <span className="px-2 py-0.5 rounded-full bg-[#C9B27C]/20 border border-[#C9B27C]/40 text-[#C9B27C] text-[10px] font-extrabold uppercase">
+                    Dirigente
                   </span>
                 </div>
-                <p className="text-xs text-[#9FA4AD] line-clamp-1">{config.churchName || 'Igreja Local'}</p>
+                <p className="text-[11px] text-[#9FA4AD] truncate max-w-[220px] sm:max-w-md">
+                  {config.churchName} {config.ministryName ? `• ${config.ministryName}` : ''}
+                </p>
               </div>
             </div>
 
-            {/* Mobile Actions */}
-            <div className="flex items-center gap-1.5 md:hidden">
-              <button
-                onClick={onOpenProjector}
-                className="p-2 rounded-xl bg-[#0B0D10] text-[#C9B27C] border border-[#292E36] text-xs font-bold flex items-center gap-1"
-                title="Modo Projetor"
-              >
-                <Tv className="w-4 h-4" />
-              </button>
-              <button
-                onClick={onLogout}
-                className="p-2 rounded-xl bg-[#0B0D10] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36]"
-                title="Sair do Painel"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Center Status Indicators */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
-            {/* Status: NO HORÁRIO / ADIANTADO / ATRASADO */}
-            <div className={`px-3 py-1.5 rounded-xl border font-mono text-xs font-extrabold flex items-center gap-2 shadow-sm ${delayStatus.badgeClass}`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${delayStatus.type === 'on_time' ? 'bg-emerald-400 animate-pulse' : delayStatus.type === 'early' ? 'bg-amber-400' : 'bg-rose-500 animate-ping'}`} />
-              <span>{delayStatus.label}</span>
-            </div>
-
-            {/* Total Vigil Progress Display */}
-            <div className="hidden sm:flex items-center gap-2 bg-[#0B0D10] px-3 py-1.5 rounded-xl border border-[#292E36] text-xs text-[#9FA4AD]">
-              <span className="font-mono text-[#F2F2F2] font-semibold">{config.startTime} → {config.endTime}</span>
-              <div className="w-20 h-2 bg-[#191D24] rounded-full overflow-hidden border border-[#292E36]">
-                <div
-                  className="h-full bg-[#C9B27C] rounded-full transition-all duration-700"
-                  style={{ width: `${totalProgress.percent}%` }}
-                />
+            {/* Quick Utility Actions */}
+            <div className="flex items-center gap-2">
+              {/* Sync Status Badge */}
+              <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold border bg-emerald-950/40 text-emerald-300 border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Sincronizado</span>
               </div>
-              <span className="font-mono font-bold text-[#C9B27C]">{totalProgress.percent}%</span>
-            </div>
 
-            {/* Desktop Actions */}
-            <div className="hidden md:flex items-center gap-2">
+              <button
+                onClick={() => setShowPublicPreviewModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#C9B27C] border border-[#C9B27C]/40 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                title="Pré-visualizar a tela pública que os membros estão vendo"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Página Pública</span>
+              </button>
+
               <button
                 onClick={onOpenProjector}
-                className="px-3 py-1.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#C9B27C] border border-[#C9B27C]/30 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                className="px-3 py-1.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center gap-1.5 transition"
+                title="Abrir tela cheia para projetor ou TV da igreja"
               >
-                <Tv className="w-3.5 h-3.5" />
-                <span>Modo Projetor</span>
+                <Tv className="w-3.5 h-3.5 text-[#C9B27C]" />
+                <span className="hidden sm:inline">Modo Telão</span>
               </button>
+
               <button
                 onClick={() => generateVigilOfficialPdf({ config, moments, repertoire })}
-                className="px-3 py-1.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center gap-1.5 transition"
+                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center gap-1.5 transition"
+                title="Gerar PDF Oficial para Impressão"
               >
                 <FileDown className="w-3.5 h-3.5 text-[#C9B27C]" />
-                <span>PDF Oficial</span>
+                <span className="hidden sm:inline">PDF</span>
               </button>
+
               <button
                 onClick={onLogout}
-                className="p-1.5 rounded-xl bg-[#0B0D10] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-300 border border-[#292E36] transition"
+                className="p-2 rounded-xl bg-[#0B0D10] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-300 border border-[#292E36] transition"
                 title="Sair do Painel"
               >
                 <LogOut className="w-4 h-4" />
@@ -571,12 +225,24 @@ export const DirigenteDashboardView: React.FC<{
         </div>
       </header>
 
-      {/* ===================== SUB-NAV TABS ===================== */}
-      <nav className="bg-[#0E1116] border-b border-[#292E36] px-4 py-2">
-        <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar">
+      {/* ===================== HORIZONTAL NAVIGATION TABS ===================== */}
+      <nav className="bg-[#0E1116] border-b border-[#292E36] px-4 py-2 sticky top-[57px] z-30 shadow-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-start gap-2 overflow-x-auto no-scrollbar py-0.5">
+          <button
+            onClick={() => setActiveTab('visao_geral')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'visao_geral'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>📊 Visão Geral</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('cronograma')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'cronograma'
                 ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
                 : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
@@ -587,8 +253,68 @@ export const DirigenteDashboardView: React.FC<{
           </button>
 
           <button
+            onClick={() => setActiveTab('vigilia')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'vigilia'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
+            }`}
+          >
+            <Church className="w-3.5 h-3.5" />
+            <span>⛪ Configurações da Vigília</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('dirigente')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'dirigente'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>👑 Dados do Dirigente</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('equipe')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'equipe'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>👥 Equipe & Ministros ({ministers.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('participantes')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'participantes'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>🎟️ Participantes ({participants.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('oracoes_avisos')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'oracoes_avisos'
+                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5" />
+            <span>🙏 Pedidos & Avisos ({prayerRequests.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('repertorio')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'repertorio'
                 ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
                 : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
@@ -599,743 +325,66 @@ export const DirigenteDashboardView: React.FC<{
           </button>
 
           <button
-            onClick={() => setActiveTab('equipe')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
-              activeTab === 'equipe'
+            onClick={() => setActiveTab('login_personalizacao')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'login_personalizacao'
                 ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
                 : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
-            <span>👤 Equipe & Presença ({ministers.length + participants.length})</span>
+            <Layout className="w-3.5 h-3.5" />
+            <span>🎨 Tela de Entrada & Login</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('pulpito')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
-              activeTab === 'pulpito'
+            onClick={() => setActiveTab('seguranca')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'seguranca'
                 ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
                 : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>📝 Notas & Púlpito ({notices.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('configuracoes')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
-              activeTab === 'configuracoes'
-                ? 'bg-[#C9B27C] text-[#0B0D10] font-bold shadow-md'
-                : 'text-[#9FA4AD] hover:text-[#F2F2F2] hover:bg-[#14171C]'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>⚙️ Configurações & QR Code</span>
+            <Key className="w-3.5 h-3.5" />
+            <span>🔐 Códigos de Acesso</span>
           </button>
         </div>
       </nav>
 
       {/* ===================== MAIN GRID (DESKTOP 2-COLUMN) ===================== */}
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 w-full flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* ================= LEFT / MAIN CONTENT AREA (7 COLUMNS) ================= */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* TAB: CRONOGRAMA */}
-            {activeTab === 'cronograma' && (
-              <div className="space-y-4 animate-fadeIn">
-                {/* Search and Add Action Bar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-[#9FA4AD] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Buscar no cronograma..."
-                      value={scheduleSearch}
-                      onChange={(e) => setScheduleSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#14171C] border border-[#292E36] text-[#F2F2F2] placeholder-[#9FA4AD]/40 text-xs focus:outline-none focus:border-[#C9B27C] transition"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleOpenNewMoment}
-                    className="px-4 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-[#C9B27C]/10 transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ ADICIONAR ATIVIDADE</span>
-                  </button>
-                </div>
-
-                {/* Moments List */}
-                <div className="space-y-2.5">
-                  {filteredMoments.map((mom, index) => {
-                    const isCurrent = activeMoment?.id === mom.id;
-                    const isExpanded = expandedMomentId === mom.id;
-                    const duration = calculateDurationMinutes(mom.startTime, mom.endTime, config.startTime);
-                    const songsCount = mom.songsList ? mom.songsList.split('\n').filter((s) => s.trim().length > 0).length : 0;
-
-                    return (
-                      <div
-                        key={mom.id}
-                        className={`rounded-2xl border transition-all overflow-hidden ${
-                          isCurrent
-                            ? 'bg-[#C9B27C]/10 border-[#C9B27C]/60 shadow-xl ring-1 ring-[#C9B27C]/30'
-                            : 'bg-[#14171C] border-[#292E36] hover:border-[#C9B27C]/40'
-                        }`}
-                      >
-                        {/* Compact Header Row (Click to toggle details) */}
-                        <div
-                          onClick={() => setExpandedMomentId(isExpanded ? null : mom.id)}
-                          className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer hover:bg-[#191D24]/50 transition select-none"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="text-center min-w-[62px] bg-[#0B0D10] px-2 py-1.5 rounded-xl border border-[#292E36] shrink-0">
-                              <span className={`font-mono text-xs font-bold block ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
-                                {mom.startTime}
-                              </span>
-                              <span className="text-[10px] text-[#9FA4AD] block font-mono">
-                                → {mom.endTime}
-                              </span>
-                            </div>
-
-                            <div className="space-y-0.5 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className={`text-sm sm:text-base font-bold truncate ${isCurrent ? 'text-[#C9B27C]' : 'text-[#F2F2F2]'}`}>
-                                  {getMomentTypeIcon(mom.type)} {mom.title}
-                                </h3>
-                                {isCurrent && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wider">
-                                    🔴 AGORA
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#9FA4AD]">
-                                <span className="font-mono text-[#F2F2F2]">{duration} min</span>
-                                {mom.responsible && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-[#C9B27C] font-semibold truncate">👤 {mom.responsible}</span>
-                                  </>
-                                )}
-                                {songsCount > 0 && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-[#9FA4AD] font-medium">🎵 {songsCount} louvor(es)</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#292E36]/60">
-                            <span className="text-[11px] text-[#9FA4AD] hover:text-[#C9B27C] font-semibold flex items-center gap-1">
-                              <span>{isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180 text-[#C9B27C]' : ''}`} />
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Expandable Details Section */}
-                        {isExpanded && (
-                          <div className="px-4 pb-4 pt-2 border-t border-[#292E36] bg-[#0B0D10]/50 space-y-3 text-xs">
-                            {mom.description && (
-                              <p className="text-[#9FA4AD] bg-[#0B0D10] p-3 rounded-xl border border-[#292E36] leading-relaxed">
-                                {mom.description}
-                              </p>
-                            )}
-
-                            {mom.scripture && (
-                              <p className="text-xs font-serif italic text-[#C9B27C]">
-                                📖 <strong>Texto Bíblico:</strong> {mom.scripture}
-                              </p>
-                            )}
-
-                            {mom.sermonTopic && (
-                              <p className="text-[#F2F2F2]"><strong className="text-[#9FA4AD]">Esboço / Tema:</strong> {mom.sermonTopic}</p>
-                            )}
-
-                            {mom.prayerMotives && (
-                              <p className="text-[#C9B27C]"><strong className="text-[#9FA4AD]">Motivos de Oração:</strong> {mom.prayerMotives}</p>
-                            )}
-
-                            {mom.slideNotes && (
-                              <p className="text-indigo-300"><strong className="text-[#9FA4AD]">Instruções de Mídia:</strong> {mom.slideNotes}</p>
-                            )}
-
-                            {mom.songsList && (
-                              <div className="bg-[#0B0D10] p-2.5 rounded-xl border border-[#292E36]">
-                                <span className="font-bold text-[#9FA4AD] block mb-1">Músicas deste momento:</span>
-                                <pre className="font-sans text-xs text-[#F2F2F2] whitespace-pre-wrap">{mom.songsList}</pre>
-                              </div>
-                            )}
-
-                            {/* Actions bar inside details */}
-                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditMoment(mom);
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-[#14171C] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold transition"
-                              >
-                                Editar Atividade
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  duplicateMoment(mom.id);
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-[#14171C] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] text-xs transition"
-                              >
-                                Duplicar
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteMoment(mom.id);
-                                }}
-                                className="p-1.5 rounded-lg bg-[#14171C] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-400 border border-[#292E36] text-xs transition"
-                                title="Excluir"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+          {/* ================= LEFT / MAIN CONTENT AREA (7-8 COLUMNS) ================= */}
+          <div className="lg:col-span-8 space-y-6">
+            {activeTab === 'visao_geral' && (
+              <DashboardOverviewSection
+                onOpenProjector={onOpenProjector}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+                onPreviewPublic={() => setShowPublicPreviewModal(true)}
+              />
             )}
 
-            {/* TAB: REPERTÓRIO */}
-            {activeTab === 'repertorio' && (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-[#F2F2F2]">🎵 Repertório de Louvores</h2>
-                    <p className="text-xs text-[#9FA4AD]">Adicione e organize as músicas da vigília com os tons musicais</p>
-                  </div>
-                  <button
-                    onClick={handleOpenNewSong}
-                    className="px-4 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold shadow-md transition"
-                  >
-                    + ADICIONAR LOUVOR
-                  </button>
-                </div>
+            {activeTab === 'cronograma' && <ScheduleManagerSection />}
 
-                <div className="space-y-2.5">
-                  {repertoire.length === 0 ? (
-                    <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-8 text-center text-xs text-[#9FA4AD]">
-                      Nenhum louvor cadastrado. Clique no botão acima para adicionar.
-                    </div>
-                  ) : (
-                    repertoire.map((song, idx) => (
-                      <div
-                        key={song.id}
-                        className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-xl bg-[#0B0D10] text-[#C9B27C] border border-[#292E36] flex items-center justify-center font-mono font-bold text-xs">
-                            {idx + 1}
-                          </span>
-                          <div>
-                            <h4 className="text-sm font-bold text-[#F2F2F2]">{song.title}</h4>
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-[#9FA4AD] mt-0.5">
-                              <span>{song.artist || 'Ministério de Louvor'}</span>
-                              {song.responsible && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-[#C9B27C]">👤 {song.responsible}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+            {activeTab === 'vigilia' && <VigilSettingsSection />}
 
-                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#292E36]">
-                          <span className="font-mono text-xs font-bold text-[#C9B27C] bg-[#0B0D10] px-3 py-1.5 rounded-xl border border-[#292E36]">
-                            Tom {song.key}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleEditSong(song)}
-                              className="p-1.5 rounded-lg bg-[#0B0D10] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36]"
-                              title="Editar"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => deleteSong(song.id)}
-                              className="p-1.5 rounded-lg bg-[#0B0D10] text-[#9FA4AD] hover:text-rose-400 border border-[#292E36]"
-                              title="Excluir"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+            {activeTab === 'dirigente' && <DirigenteProfileSection />}
 
-            {/* TAB: EQUIPE & PRESENÇA */}
-            {activeTab === 'equipe' && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* Ministers / Scaled Officers */}
-                <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 space-y-4 shadow-xl">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
-                        <Users className="w-4 h-4 text-[#C9B27C]" />
-                        <span>Escala de Ministros & Líderes</span>
-                      </h2>
-                      <p className="text-xs text-[#9FA4AD]">Pastores, cantores, intercessores e equipes escaladas</p>
-                    </div>
-                    <button
-                      onClick={handleOpenNewMinister}
-                      className="px-3.5 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold transition"
-                    >
-                      + Novo Ministro
-                    </button>
-                  </div>
+            {activeTab === 'equipe' && <MinistersManagerSection />}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {ministers.map((min) => (
-                      <div
-                        key={min.id}
-                        className="rounded-2xl bg-[#0B0D10] border border-[#292E36] p-3.5 flex items-center justify-between gap-2 shadow-sm"
-                      >
-                        <div>
-                          <h4 className="text-sm font-bold text-[#F2F2F2]">{min.name}</h4>
-                          <span className="text-[11px] text-[#C9B27C] font-semibold block">{min.role}</span>
-                          {min.phone && <span className="text-[10px] text-[#9FA4AD] block font-mono">{min.phone}</span>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleEditMinister(min)}
-                            className="p-1.5 rounded-lg bg-[#14171C] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36]"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => deleteMinister(min.id)}
-                            className="p-1.5 rounded-lg bg-[#14171C] text-[#9FA4AD] hover:text-rose-400 border border-[#292E36]"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {activeTab === 'participantes' && <ParticipantsManagerSection />}
 
-                {/* Presença / Check-in */}
-                <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 space-y-4 shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
-                        <CheckSquare className="w-4 h-4 text-emerald-400" />
-                        <span>Controle de Presença dos Participantes</span>
-                      </h2>
-                      <p className="text-xs text-[#9FA4AD]">
-                        Total: {participants.length} inscritos • {participants.filter((p) => p.status === 'presente').length} presentes
-                      </p>
-                    </div>
-                  </div>
+            {activeTab === 'oracoes_avisos' && <PrayersNoticesSection />}
 
-                  <form onSubmit={handleAddParticipant} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Nome do participante..."
-                      value={newParticipantName}
-                      onChange={(e) => setNewParticipantName(e.target.value)}
-                      className="flex-1 px-3.5 py-2 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold shadow transition"
-                    >
-                      Registrar
-                    </button>
-                  </form>
+            {activeTab === 'repertorio' && <RepertoireManagerSection />}
 
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {participants.map((p) => (
-                      <div
-                        key={p.id}
-                        className="rounded-xl bg-[#0B0D10] border border-[#292E36] p-3 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <span className="font-semibold text-[#F2F2F2]">{p.name}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateParticipantStatus(p.id, p.status === 'presente' ? 'confirmado' : 'presente')
-                            }
-                            className={`px-2.5 py-1 rounded-lg font-bold transition text-[11px] ${
-                              p.status === 'presente'
-                                ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
-                                : 'bg-[#14171C] text-[#9FA4AD] border border-[#292E36]'
-                            }`}
-                          >
-                            {p.status === 'presente' ? '✓ Presente' : 'Marcar Presença'}
-                          </button>
-                          <button
-                            onClick={() => deleteParticipant(p.id)}
-                            className="p-1 text-[#9FA4AD] hover:text-rose-400"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            {activeTab === 'login_personalizacao' && <LoginPageCustomizerSection />}
 
-            {/* TAB: NOTAS & PÚLPITO */}
-            {activeTab === 'pulpito' && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* Notices form and list */}
-                <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 space-y-4 shadow-xl">
-                  <div>
-                    <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
-                      <Megaphone className="w-4 h-4 text-[#C9B27C]" />
-                      <span>Avisos de Púlpito & Alertas da Vigília</span>
-                    </h2>
-                    <p className="text-xs text-[#9FA4AD]">Exibidos no topo da tela para os participantes</p>
-                  </div>
-
-                  <form onSubmit={handleAddNotice} className="space-y-3 bg-[#0B0D10] p-4 rounded-2xl border border-[#292E36]">
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Título do aviso (ex: Estacionamento, Ceia, etc.)"
-                        value={noticeTitle}
-                        onChange={(e) => setNoticeTitle(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl bg-[#14171C] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                      />
-                    </div>
-                    <div>
-                      <textarea
-                        rows={2}
-                        placeholder="Mensagem do aviso..."
-                        value={noticeContent}
-                        onChange={(e) => setNoticeContent(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl bg-[#14171C] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-2 text-xs text-[#9FA4AD] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={noticeIsUrgent}
-                          onChange={(e) => setNoticeIsUrgent(e.target.checked)}
-                          className="rounded bg-[#14171C] border-[#292E36] text-[#C9B27C]"
-                        />
-                        <span>Destacar como Aviso Urgente</span>
-                      </label>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold transition"
-                      >
-                        Publicar Aviso
-                      </button>
-                    </div>
-                  </form>
-
-                  <div className="space-y-2.5">
-                    {notices.map((n) => (
-                      <div
-                        key={n.id}
-                        className="rounded-2xl bg-[#0B0D10] border border-[#292E36] p-3.5 flex items-start justify-between gap-3 text-xs"
-                      >
-                        <div>
-                          <h4 className="font-bold text-[#F2F2F2] flex items-center gap-2">
-                            {n.isUrgent && <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500/40 text-[10px] uppercase font-bold">Urgente</span>}
-                            <span>{n.title}</span>
-                          </h4>
-                          <p className="text-[#9FA4AD] mt-1">{n.content}</p>
-                        </div>
-                        <button
-                          onClick={() => deleteNotice(n.id)}
-                          className="text-[#9FA4AD] hover:text-rose-400 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Moderation of Prayer Requests */}
-                <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 space-y-4 shadow-xl">
-                  <div>
-                    <h2 className="text-base font-bold text-[#F2F2F2] flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#C9B27C]" />
-                      <span>Moderação de Pedidos de Oração ({prayerRequests.length})</span>
-                    </h2>
-                    <p className="text-xs text-[#9FA4AD]">Aprove ou examine os motivos enviados pelos membros</p>
-                  </div>
-
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {prayerRequests.map((pr) => (
-                      <div
-                        key={pr.id}
-                        className="rounded-xl bg-[#0B0D10] border border-[#292E36] p-3 space-y-1.5 text-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-[#F2F2F2]">{pr.authorName}</span>
-                          <span className="text-[10px] text-[#C9B27C] font-mono">{pr.category}</span>
-                        </div>
-                        <p className="text-[#9FA4AD]">"{pr.request}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: CONFIGURAÇÕES & QR CODE */}
-            {activeTab === 'configuracoes' && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* 🔐 CÓDIGOS DE ACESSO & COMPARTILHAMENTO */}
-                <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 sm:p-6 space-y-5 shadow-xl">
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-[#F2F2F2] flex items-center gap-2 font-serif">
-                      <Lock className="w-5 h-5 text-[#C9B27C]" />
-                      <span>🔐 CÓDIGOS DE ACESSO & COMPARTILHAMENTO</span>
-                    </h2>
-                    <p className="text-xs text-[#9FA4AD] mt-0.5">
-                      Gerencie com segurança os códigos de acesso e os links de compartilhamento da vigília.
-                    </p>
-                  </div>
-
-                  {/* Codes Display Box */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* 🔐 Código do Dirigente */}
-                    <div className="bg-[#0B0D10] p-4 sm:p-5 rounded-2xl border border-[#292E36] flex flex-col justify-between space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider flex items-center gap-1.5">
-                          <Shield className="w-3.5 h-3.5 text-[#C9B27C]" />
-                          <span>🔐 Código do Dirigente</span>
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 font-semibold">
-                          Privado
-                        </span>
-                      </div>
-
-                      <div className="py-1">
-                        <span className="font-mono text-xl sm:text-2xl font-black text-[#F2F2F2] tracking-wider">
-                          {config.dirigenteCode || 'DIR-7391'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2 border-t border-[#292E36]">
-                        <button
-                          onClick={() => copyToClipboard(config.dirigenteCode || 'DIR-7391', 'dirigenteCode')}
-                          className="flex-1 py-2 px-3 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-xs font-semibold text-[#F2F2F2] border border-[#292E36] flex items-center justify-center gap-1.5 transition cursor-pointer"
-                        >
-                          {copiedKey === 'dirigenteCode' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[#C9B27C]" />}
-                          <span>{copiedKey === 'dirigenteCode' ? 'Copiado!' : 'Copiar'}</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditCode('dirigente')}
-                          className="py-2 px-3.5 rounded-xl bg-[#C9B27C]/15 hover:bg-[#C9B27C]/25 text-xs font-bold text-[#C9B27C] border border-[#C9B27C]/40 flex items-center gap-1.5 transition cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          <span>✏️ Editar Código</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 👥 Código dos Membros */}
-                    <div className="bg-[#0B0D10] p-4 sm:p-5 rounded-2xl border border-[#292E36] flex flex-col justify-between space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-[#C9B27C]" />
-                          <span>👥 Código dos Membros</span>
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-semibold">
-                          Público
-                        </span>
-                      </div>
-
-                      <div className="py-1">
-                        <span className="font-mono text-xl sm:text-2xl font-black text-[#C9B27C] tracking-wider">
-                          {config.memberCode || config.accessCode}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2 border-t border-[#292E36]">
-                        <button
-                          onClick={() => copyToClipboard(config.memberCode || config.accessCode, 'memberCode')}
-                          className="flex-1 py-2 px-3 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-xs font-semibold text-[#F2F2F2] border border-[#292E36] flex items-center justify-center gap-1.5 transition cursor-pointer"
-                        >
-                          {copiedKey === 'memberCode' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[#C9B27C]" />}
-                          <span>{copiedKey === 'memberCode' ? 'Copiado!' : 'Copiar'}</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditCode('membro')}
-                          className="py-2 px-3.5 rounded-xl bg-[#14171C] hover:bg-[#191D24] text-xs font-bold text-[#F2F2F2] border border-[#292E36] flex items-center gap-1.5 transition cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-[#9FA4AD]" />
-                          <span>✏️ Editar Código</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Share Action Buttons */}
-                  <div className="space-y-2 pt-2 border-t border-[#292E36]">
-                    <span className="text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider block">
-                      Compartilhamento da Vigília:
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => copyToClipboard(memberLink, 'link')}
-                        className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
-                      >
-                        <Link2 className="w-4 h-4 text-[#C9B27C]" />
-                        <span>{copiedKey === 'link' ? 'Link Copiado!' : '🔗 Copiar Link Público'}</span>
-                      </button>
-
-                      <button
-                        onClick={handleWhatsAppShare}
-                        className="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-2 transition cursor-pointer"
-                      >
-                        <Share2 className="w-4 h-4" />
-                        <span>📱 Compartilhar</span>
-                      </button>
-
-                      <button
-                        onClick={() => setShowQrModal(true)}
-                        className="px-4 py-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#C9B27C] border border-[#C9B27C]/40 text-xs font-bold flex items-center gap-2 transition cursor-pointer"
-                      >
-                        <QrCode className="w-4 h-4" />
-                        <span>📷 Gerar QR Code</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Edit Vigil Info Form */}
-                <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 sm:p-6 space-y-4 shadow-xl">
-                  <h3 className="text-base font-bold text-[#F2F2F2]">Editar Dados da Vigília</h3>
-
-                  <form onSubmit={handleSaveSettings} className="space-y-3 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Nome da Vigília:</label>
-                        <input
-                          type="text"
-                          value={settingsForm.vigilName}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, vigilName: e.target.value })}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Nome da Igreja:</label>
-                        <input
-                          type="text"
-                          value={settingsForm.churchName}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, churchName: e.target.value })}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="font-bold text-[#9FA4AD] block mb-1">Tema:</label>
-                      <input
-                        type="text"
-                        value={settingsForm.theme}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, theme: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Versículo Chave:</label>
-                        <input
-                          type="text"
-                          value={settingsForm.keyVerse}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, keyVerse: e.target.value })}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Referência:</label>
-                        <input
-                          type="text"
-                          value={settingsForm.verseReference}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, verseReference: e.target.value })}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Data:</label>
-                        <input
-                          type="date"
-                          value={settingsForm.date}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, date: e.target.value })}
-                          className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Horário Início:</label>
-                        <input
-                          type="time"
-                          value={settingsForm.startTime}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, startTime: e.target.value })}
-                          className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-bold text-[#9FA4AD] block mb-1">Horário Fim:</label>
-                        <input
-                          type="time"
-                          value={settingsForm.endTime}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, endTime: e.target.value })}
-                          className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-[#292E36]">
-                      {settingsSaved ? (
-                        <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Dados atualizados com sucesso!
-                        </span>
-                      ) : <span />}
-
-                      <button
-                        type="submit"
-                        className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold transition shadow"
-                      >
-                        SALVAR DADOS
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+            {activeTab === 'seguranca' && <SecurityAccessSection />}
           </div>
 
-          {/* ================= RIGHT / STICKY LIVE CONTROLS PANEL (5 COLUMNS) ================= */}
-          <div className="lg:col-span-5 space-y-5 lg:sticky lg:top-20">
-            {/* 🔴 CARD 1: AGORA */}
+          {/* ================= RIGHT / STICKY LIVE CONTROLS PANEL (4 COLUMNS) ================= */}
+          <div className="lg:col-span-4 space-y-5 lg:sticky lg:top-24">
+            {/* 🔴 CARD 1: AGORA EM ANDAMENTO */}
             <div className="rounded-3xl bg-gradient-to-br from-[#191D24] via-[#14171C] to-[#0E1116] border-2 border-[#C9B27C]/50 p-5 shadow-2xl space-y-4">
               <div className="flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold uppercase tracking-wider">
@@ -1350,11 +399,11 @@ export const DirigenteDashboardView: React.FC<{
               {activeMoment ? (
                 <div className="space-y-3">
                   <div>
-                    <h3 className="text-lg sm:text-xl font-bold text-[#F2F2F2] leading-tight">
-                      {getMomentTypeIcon(activeMoment.type)} {activeMoment.title}
+                    <h3 className="text-base sm:text-lg font-bold text-[#F2F2F2] leading-tight">
+                      {activeMoment.title}
                     </h3>
                     {activeMoment.responsible && (
-                      <p className="text-xs sm:text-sm font-semibold text-[#C9B27C] flex items-center gap-1.5 mt-1">
+                      <p className="text-xs font-semibold text-[#C9B27C] flex items-center gap-1.5 mt-1">
                         <User className="w-3.5 h-3.5" />
                         <span>{activeMoment.responsible}</span>
                       </p>
@@ -1398,597 +447,172 @@ export const DirigenteDashboardView: React.FC<{
                 </div>
               ) : (
                 <div className="text-center py-4 text-xs text-[#9FA4AD]">
-                  Nenhum momento ativo no momento exato ({currentTime}).
+                  Nenhum momento ativo no horário atual ({currentTime}).
                 </div>
               )}
             </div>
 
-            {/* ⏭️ CARD 2: PRÓXIMO */}
-            {nextMoment && (
-              <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 shadow-lg space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider">
-                  <span className="flex items-center gap-1.5">
-                    <ChevronRight className="w-4 h-4 text-[#C9B27C]" />
-                    <span>⏭️ PRÓXIMO</span>
-                  </span>
-                  <span className="font-mono text-xs font-bold text-[#C9B27C]">
-                    {nextMoment.startTime} → {nextMoment.endTime}
-                  </span>
-                </div>
-                <h4 className="text-sm font-bold text-[#F2F2F2]">
-                  {getMomentTypeIcon(nextMoment.type)} {nextMoment.title}
-                </h4>
-                {nextMoment.responsible && (
-                  <p className="text-xs text-[#9FA4AD] flex items-center gap-1">
-                    <span>Responsável:</span>
-                    <strong className="text-[#C9B27C]">{nextMoment.responsible}</strong>
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ⏭️ CARD 3: DEPOIS */}
-            {thirdMoment && (
-              <div className="rounded-2xl bg-[#14171C]/70 border border-[#292E36] p-4 shadow space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-bold text-[#9FA4AD] uppercase tracking-wider">
-                  <span>⏭️ DEPOIS</span>
-                  <span className="font-mono text-xs font-semibold text-[#9FA4AD]">
-                    {thirdMoment.startTime} → {thirdMoment.endTime}
-                  </span>
-                </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#F2F2F2]">
-                  {getMomentTypeIcon(thirdMoment.type)} {thirdMoment.title}
-                </h4>
-                {thirdMoment.responsible && (
-                  <p className="text-[11px] text-[#9FA4AD]">
-                    {thirdMoment.responsible}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ⏱️ CONTROLE DE ATRASO */}
-            <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 space-y-3 shadow-xl">
+            {/* ⏳ CARD 2: A SEGUIR */}
+            <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 shadow-xl space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-[#F2F2F2] uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-[#C9B27C]" />
-                  <span>Controle de Atraso & Ajustes</span>
-                </h3>
-                <span className="text-[11px] font-mono font-bold text-[#C9B27C]">
-                  {delayMinutes > 0 ? `+${delayMinutes} min` : `${delayMinutes} min`}
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                  ⏳ A SEGUIR
+                </span>
+                {nextMoment && (
+                  <span className="text-xs font-mono text-[#9FA4AD]">
+                    {nextMoment.startTime}
+                  </span>
+                )}
+              </div>
+
+              {nextMoment ? (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold text-[#F2F2F2] leading-snug">
+                    {nextMoment.title}
+                  </h4>
+                  {nextMoment.responsible && (
+                    <p className="text-xs text-[#C9B27C] flex items-center gap-1 font-semibold">
+                      <User className="w-3 h-3" />
+                      <span>{nextMoment.responsible}</span>
+                    </p>
+                  )}
+                  {nextMoment.description && (
+                    <p className="text-xs text-[#9FA4AD] line-clamp-2">
+                      {nextMoment.description}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-[#9FA4AD]">Fim da programação da vigília.</p>
+              )}
+            </div>
+
+            {/* 📋 CARD 3: CHECKLIST RÁPIDO DO PÚLPITO */}
+            <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 shadow-xl space-y-3">
+              <div className="flex items-center justify-between border-b border-[#292E36] pb-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C9B27C] flex items-center gap-1.5">
+                  <CheckSquare className="w-4 h-4" />
+                  <span>Checklist da Vigília</span>
+                </h4>
+                <span className="text-[11px] text-[#9FA4AD]">
+                  {checklist.filter((c) => c.done).length}/{checklist.length}
                 </span>
               </div>
 
-              {/* Quick delta buttons */}
-              <div className="grid grid-cols-6 gap-1.5">
-                {[-10, -5, -1, 1, 5, 10].map((delta) => (
-                  <button
-                    key={delta}
-                    onClick={() => adjustDelay(delta)}
-                    className={`py-2 rounded-xl text-xs font-mono font-bold transition border ${
-                      delta > 0
-                        ? 'bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border-rose-500/30'
-                        : 'bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-300 border-emerald-500/30'
-                    }`}
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {checklist.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => toggleChecklist(item.id)}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] border border-[#292E36] text-xs cursor-pointer transition"
                   >
-                    {delta > 0 ? `+${delta}` : delta}
-                  </button>
+                    <div className="flex items-center gap-2 truncate">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => {}}
+                        className="w-3.5 h-3.5 rounded text-[#C9B27C] bg-transparent border-[#292E36]"
+                      />
+                      <span className={`truncate ${item.done ? 'line-through text-[#9FA4AD]' : 'text-[#F2F2F2]'}`}>
+                        {item.text}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeChecklistItem(item.id);
+                      }}
+                      className="text-[#9FA4AD] hover:text-rose-400 p-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
 
-              {/* Recalculate & Reset actions */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#292E36]">
+              <form onSubmit={handleAddChecklist} className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newChecklistText}
+                  onChange={(e) => setNewChecklistText(e.target.value)}
+                  placeholder="Novo item..."
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
+                />
                 <button
-                  onClick={recalculateScheduleTimes}
-                  className="py-2 px-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#C9B27C] border border-[#C9B27C]/40 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  type="submit"
+                  className="p-2 rounded-xl bg-[#C9B27C] text-[#0B0D10] font-bold text-xs shrink-0"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>RECALCULAR</span>
+                  <Plus className="w-3.5 h-3.5" />
                 </button>
-                <button
-                  onClick={resetScheduleToOriginal}
-                  className="py-2 px-2.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>ORIGINAL</span>
-                </button>
-              </div>
+              </form>
+            </div>
 
-              {/* Recalculated forecast notification */}
-              {delayMinutes !== 0 && (
-                <div className="p-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#9FA4AD] space-y-1">
-                  <div className="flex justify-between">
-                    <span>Previsão de Término:</span>
-                    <strong className="text-[#C9B27C] font-mono">{recalculatedEndTime}</strong>
-                  </div>
-                  <p className="text-[10px] text-[#9FA4AD]/80">
-                    * Todos os horários seguintes foram reajustados para manter a duração das ministrações.
-                  </p>
-                </div>
-              )}
+            {/* 💾 CARD 4: BACKUP & EXPORTAÇÃO JSON */}
+            <div className="rounded-3xl bg-[#14171C] border border-[#292E36] p-5 shadow-xl space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#9FA4AD] flex items-center gap-1.5">
+                <Download className="w-4 h-4 text-[#C9B27C]" />
+                <span>Backup & Sincronização Geral</span>
+              </h4>
+
+              <p className="text-[11px] text-[#9FA4AD]">
+                Exporte todo o banco de dados da vigília (momentos, equipe, participantes, louvores) para arquivo local.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={exportDataJSON}
+                  className="py-2 px-3 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#C9B27C]" />
+                  <span>Exportar JSON</span>
+                </button>
+
+                <label className="py-2 px-3 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                  <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Restaurar</span>
+                  <input type="file" accept=".json" onChange={handleFileImport} className="hidden" />
+                </label>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ===================== FULLSCREEN QR CODE MODAL ===================== */}
-      {showQrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/95 backdrop-blur-md">
-          <div className="max-w-md w-full rounded-3xl bg-[#14171C] border-2 border-[#C9B27C]/50 p-6 sm:p-8 text-center space-y-5 shadow-2xl animate-scaleUp">
-            <div className="space-y-1">
-              <span className="text-xs uppercase tracking-widest text-[#C9B27C] font-bold font-mono">
-                {config.churchName || 'IGREJA LOCAL'}
+      {/* ===================== MODAL PREVIEW DA PÁGINA PÚBLICA ===================== */}
+      {showPublicPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col">
+          {/* Top Bar inside preview */}
+          <div className="bg-[#14171C] border-b border-[#292E36] px-4 py-3 flex items-center justify-between shadow-xl">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5" />
+                <span>Pré-visualização da Página Pública do Membro</span>
               </span>
-              <h2 className="text-xl sm:text-2xl font-bold text-[#F2F2F2] font-serif">
-                {config.vigilName || 'Vigília de Oração'}
-              </h2>
-              <p className="text-xs text-[#9FA4AD]">
-                Aponte a câmera do celular para acessar a área do membro
-              </p>
-            </div>
-
-            <div className="p-4 bg-white rounded-2xl inline-block shadow-xl border-4 border-[#C9B27C]">
-              <QRCodeSVG
-                value={memberLink}
-                size={220}
-                level="H"
-                includeMargin={false}
-                fgColor="#0B0D10"
-                bgColor="#FFFFFF"
-              />
-            </div>
-
-            <div className="bg-[#0B0D10] p-3 rounded-2xl border border-[#292E36] space-y-1">
-              <span className="text-[10px] font-bold uppercase text-[#9FA4AD] tracking-wider block">Código do Membro</span>
-              <span className="font-mono text-2xl font-black text-[#C9B27C] tracking-wider">
-                {config.memberCode || config.accessCode}
+              <span className="text-xs text-[#9FA4AD] hidden sm:inline">
+                (Visualização exata do que os fiéis e visitantes assistem no celular)
               </span>
             </div>
 
             <button
-              onClick={() => setShowQrModal(false)}
-              className="w-full py-3 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-bold text-xs shadow-lg transition"
+              onClick={() => setShowPublicPreviewModal(false)}
+              className="px-4 py-1.5 rounded-xl bg-[#0B0D10] hover:bg-[#191D24] text-[#F2F2F2] border border-[#292E36] text-xs font-bold flex items-center gap-1.5 transition"
             >
-              Fechar Tela do QR Code
+              <X className="w-4 h-4" />
+              <span>Fechar Prévia</span>
             </button>
           </div>
-        </div>
-      )}
 
-      {/* ===================== MOMENT ADD/EDIT MODAL ===================== */}
-      {showMomentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-md">
-          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-4 shadow-2xl animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
-              <h3 className="text-base font-bold text-[#F2F2F2]">
-                {editingMomentId ? 'Editar Atividade' : 'Adicionar Atividade ao Cronograma'}
-              </h3>
-              <button
-                onClick={() => setShowMomentModal(false)}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-semibold"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveMoment} className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Título da Atividade:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Momento de Louvor, Clamor pelas Famílias..."
-                  value={momentForm.title}
-                  onChange={(e) => setMomentForm({ ...momentForm, title: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Tipo:</label>
-                  <select
-                    value={momentForm.type}
-                    onChange={(e) => setMomentForm({ ...momentForm, type: e.target.value as MomentType })}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                  >
-                    <option value="oracao">🙏 Oração</option>
-                    <option value="louvor">🎵 Louvor</option>
-                    <option value="pregacao">📖 Pregação</option>
-                    <option value="testemunho">💬 Testemunho</option>
-                    <option value="dinamica">👥 Dinâmica</option>
-                    <option value="ceia">🍞 Santa Ceia</option>
-                    <option value="pausa">☕ Pausa / Café</option>
-                    <option value="aviso">📢 Avisos</option>
-                    <option value="outro">✨ Outro</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Início:</label>
-                  <input
-                    type="time"
-                    required
-                    value={momentForm.startTime}
-                    onChange={(e) => setMomentForm({ ...momentForm, startTime: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Término:</label>
-                  <input
-                    type="time"
-                    required
-                    value={momentForm.endTime}
-                    onChange={(e) => setMomentForm({ ...momentForm, endTime: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Responsável / Ministério:</label>
-                <input
-                  type="text"
-                  placeholder="Nome do pastor, cantor ou equipe..."
-                  value={momentForm.responsible}
-                  onChange={(e) => setMomentForm({ ...momentForm, responsible: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Texto Bíblico Base (opcional):</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Filipenses 4:6-7"
-                  value={momentForm.scripture}
-                  onChange={(e) => setMomentForm({ ...momentForm, scripture: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Notas de Púlpito / Instruções (privado do dirigente):</label>
-                <textarea
-                  rows={2}
-                  placeholder="Orientações de púlpito, transição de louvor ou avisos internos..."
-                  value={momentForm.prayerMotives || momentForm.sermonTopic || momentForm.description}
-                  onChange={(e) => setMomentForm({ ...momentForm, description: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#292E36]">
-                <button
-                  type="button"
-                  onClick={() => setShowMomentModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-[#0B0D10] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-bold shadow"
-                >
-                  Salvar Atividade
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== SONG ADD/EDIT MODAL ===================== */}
-      {showSongModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-md">
-          <div className="max-w-md w-full rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-4 shadow-2xl animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
-              <h3 className="text-base font-bold text-[#F2F2F2]">
-                {editingSongId ? 'Editar Louvor' : 'Adicionar Louvor ao Repertório'}
-              </h3>
-              <button
-                onClick={() => setShowSongModal(false)}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-semibold"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSong} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Nome do Louvor:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Porque Ele Vive, Bondade de Deus..."
-                  value={songForm.title}
-                  onChange={(e) => setSongForm({ ...songForm, title: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Cantor / Ministério:</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Harpa Cristã, Fernandinho..."
-                    value={songForm.artist}
-                    onChange={(e) => setSongForm({ ...songForm, artist: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#9FA4AD] block mb-1">Tom Musical (Key):</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: G, C, D, Em, F#m..."
-                    value={songForm.key}
-                    onChange={(e) => setSongForm({ ...songForm, key: e.target.value.toUpperCase() })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs font-mono font-bold text-[#C9B27C]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Dirigente / Responsável pelo Louvor:</label>
-                <input
-                  type="text"
-                  placeholder="Nome do solista ou grupo..."
-                  value={songForm.responsible}
-                  onChange={(e) => setSongForm({ ...songForm, responsible: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#292E36]">
-                <button
-                  type="button"
-                  onClick={() => setShowSongModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[#0B0D10] text-[#9FA4AD]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-bold shadow"
-                >
-                  Salvar Louvor
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== MINISTER ADD/EDIT MODAL ===================== */}
-      {showMinisterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-md">
-          <div className="max-w-md w-full rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-4 shadow-2xl animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
-              <h3 className="text-base font-bold text-[#F2F2F2]">
-                {editingMinisterId ? 'Editar Ministro' : 'Cadastrar Ministro na Escala'}
-              </h3>
-              <button
-                onClick={() => setShowMinisterModal(false)}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-semibold"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveMinister} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Nome:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nome do irmão(ã)..."
-                  value={ministerForm.name}
-                  onChange={(e) => setMinisterForm({ ...ministerForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2] focus:outline-none focus:border-[#C9B27C]"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Função / Ministério:</label>
-                <select
-                  value={ministerForm.role}
-                  onChange={(e) => setMinisterForm({ ...ministerForm, role: e.target.value as MinisterRole })}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                >
-                  <option value="Pastor">Pastor</option>
-                  <option value="Pregador">Pregador</option>
-                  <option value="Dirigente">Dirigente</option>
-                  <option value="Cantor">Cantor / Solista</option>
-                  <option value="Músico">Músico / Instrumentista</option>
-                  <option value="Intercessor">Intercessor / Oração</option>
-                  <option value="Testemunho">Testemunho</option>
-                  <option value="Recepção">Recepção</option>
-                  <option value="Equipe de Café">Equipe de Café / Ceia</option>
-                  <option value="Mídia / Som">Mídia / Telão / Som</option>
-                  <option value="Equipe de Apoio">Equipe de Apoio</option>
-                  <option value="Outro">Outro</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-bold text-[#9FA4AD] block mb-1">Telefone (opcional):</label>
-                <input
-                  type="text"
-                  placeholder="(00) 00000-0000"
-                  value={ministerForm.phone}
-                  onChange={(e) => setMinisterForm({ ...ministerForm, phone: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D10] border border-[#292E36] text-xs text-[#F2F2F2]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#292E36]">
-                <button
-                  type="button"
-                  onClick={() => setShowMinisterModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[#0B0D10] text-[#9FA4AD]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-bold shadow"
-                >
-                  Salvar Ministro
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* ===================== EDIT ACCESS CODE MODAL & CONFIRMATION ===================== */}
-      {showEditCodeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0D10]/85 backdrop-blur-md">
-          <div className="max-w-md w-full rounded-3xl bg-[#14171C] border border-[#292E36] p-6 space-y-5 shadow-2xl animate-scaleUp">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-[#292E36] pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#C9B27C]/15 text-[#C9B27C] flex items-center justify-center">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#F2F2F2]">
-                    {editingCodeType === 'dirigente' ? 'Alterar Código do Dirigente' : 'Alterar Código dos Membros'}
-                  </h3>
-                  <span className="text-[11px] text-[#9FA4AD]">
-                    {editingCodeType === 'dirigente' ? 'Acesso privado da liderança' : 'Acesso público da congregação'}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowEditCodeModal(false);
-                  setEditCodeStep('input');
-                  setEditCodeError('');
-                }}
-                className="text-[#9FA4AD] hover:text-[#F2F2F2] text-xs font-semibold p-1"
-              >
-                Fechar
-              </button>
-            </div>
-
-            {/* STEP 1: INPUT NEW CODE */}
-            {editCodeStep === 'input' && (
-              <form onSubmit={handleProceedToConfirmCode} className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-[#F2F2F2] block mb-1">
-                    Novo Código de Acesso:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={newCustomCodeInput}
-                    onChange={(e) => setNewCustomCodeInput(e.target.value.toUpperCase())}
-                    placeholder={editingCodeType === 'dirigente' ? 'Ex: VIGILIA2026' : 'Ex: VIG-7391'}
-                    className="w-full px-4 py-3 rounded-xl bg-[#0B0D10] border border-[#292E36] text-base font-mono font-bold text-[#C9B27C] focus:outline-none focus:border-[#C9B27C] uppercase transition tracking-wider"
-                  />
-                  <p className="text-[11px] text-[#9FA4AD] mt-1.5 leading-relaxed">
-                    Você pode usar qualquer formato de texto e números (ex: <strong>VIGILIA2026</strong>, <strong>DIR-4827</strong>, <strong>MAD-2026</strong>). Mínimo de 3 caracteres.
-                  </p>
-                </div>
-
-                {editCodeError && (
-                  <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>{editCodeError}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditCodeModal(false);
-                      setEditCodeError('');
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-[#0B0D10] text-[#9FA4AD] text-xs font-semibold hover:text-[#F2F2F2] transition"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold shadow-lg transition"
-                  >
-                    Continuar
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* STEP 2: CONFIRMATION DIALOG */}
-            {editCodeStep === 'confirm' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-amber-200 text-xs space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-amber-300">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>Tem certeza que deseja alterar o código de acesso?</span>
-                  </div>
-                  <p className="text-[11px] text-amber-200/80 leading-relaxed">
-                    Depois da alteração, o código antigo deixará de funcionar imediatamente para todos os usuários.
-                  </p>
-                </div>
-
-                {/* Diff summary box */}
-                <div className="bg-[#0B0D10] p-3.5 rounded-xl border border-[#292E36] space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#9FA4AD]">Código Atual:</span>
-                    <span className="font-mono font-bold text-[#F2F2F2]">
-                      {editingCodeType === 'dirigente' ? (config.dirigenteCode || 'DIR-7391') : (config.memberCode || config.accessCode)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-[#292E36] pt-2">
-                    <span className="text-[#9FA4AD]">Novo Código:</span>
-                    <span className="font-mono font-bold text-[#C9B27C] text-sm">
-                      {newCustomCodeInput.trim().toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-
-                {editCodeError && (
-                  <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>{editCodeError}</span>
-                  </div>
-                )}
-
-                {editCodeSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                    <span>{editCodeSuccess}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#292E36]">
-                  <button
-                    type="button"
-                    disabled={!!editCodeSuccess}
-                    onClick={() => setEditCodeStep('input')}
-                    className="px-4 py-2.5 rounded-xl bg-[#0B0D10] text-[#9FA4AD] text-xs font-semibold hover:text-[#F2F2F2] transition disabled:opacity-50"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!!editCodeSuccess}
-                    onClick={handleExecuteSaveNewCode}
-                    className="px-5 py-2.5 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] text-xs font-bold shadow-lg transition disabled:opacity-50 flex items-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>Salvar Novo Código</span>
-                  </button>
-                </div>
-              </div>
-            )}
+          {/* Body with Member View */}
+          <div className="flex-1 overflow-y-auto">
+            <MemberView
+              onOpenDirigenteAuth={() => setShowPublicPreviewModal(false)}
+              onOpenProjector={() => {
+                setShowPublicPreviewModal(false);
+                onOpenProjector();
+              }}
+              onLogout={() => setShowPublicPreviewModal(false)}
+            />
           </div>
         </div>
       )}

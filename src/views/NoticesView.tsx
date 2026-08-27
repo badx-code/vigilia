@@ -186,7 +186,7 @@ export const NoticesView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: Mudança no Horário do Intervalo, Chegada..."
-                  value={formData.title}
+                  value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -197,7 +197,7 @@ export const NoticesView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Geral, Louvor, Alimentação, Estacionamento"
-                  value={formData.category}
+                  value={formData.category || ''}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -211,7 +211,7 @@ export const NoticesView: React.FC = () => {
                   required
                   rows={3}
                   placeholder="Escreva a mensagem clara para os participantes e equipes..."
-                  value={formData.content}
+                  value={formData.content || ''}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none resize-none"
                 />

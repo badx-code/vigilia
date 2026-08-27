@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVigilia } from '../context/VigiliaContext';
 import { VigiliaConfig } from '../types';
 import { calculateVigilDurationHours } from '../utils/timeUtils';
+import { ServerMonitoringSection } from '../components/dashboard/ServerMonitoringSection';
 import {
   Settings,
   Sliders,
@@ -26,6 +27,12 @@ import {
   Flame,
   Eye,
   EyeOff,
+  Server,
+  Activity,
+  Database,
+  Church,
+  LayoutTemplate,
+  Check,
 } from 'lucide-react';
 
 export const AdminSettingsView: React.FC = () => {
@@ -45,9 +52,15 @@ export const AdminSettingsView: React.FC = () => {
     lockDirigenteMode,
   } = useVigilia();
 
+  const [activeSectionTab, setActiveSectionTab] = useState<'identidade' | 'geral' | 'seguranca' | 'servidor'>('identidade');
   const [formData, setFormData] = useState<VigiliaConfig>({ ...config });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  // Sync formData with config updates from server
+  useEffect(() => {
+    setFormData({ ...config });
+  }, [config]);
 
   // PIN Change State
   const [currentPinInput, setCurrentPinInput] = useState('');
@@ -60,26 +73,30 @@ export const AdminSettingsView: React.FC = () => {
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (activePinValue && !currentPinInput.trim()) {
+      setPinChangeMsg({ type: 'error', text: 'Por favor, digite a sua senha / PIN atual para confirmar a alteração.' });
+      return;
+    }
     if (!newPinInput.trim()) {
       setPinChangeMsg({ type: 'error', text: 'Por favor, digite a nova senha / PIN.' });
       return;
     }
-    if (newPinInput.trim().length < 2) {
-      setPinChangeMsg({ type: 'error', text: 'A nova senha deve conter no mínimo 2 caracteres.' });
+    if (newPinInput.trim().length < 3) {
+      setPinChangeMsg({ type: 'error', text: 'A nova senha deve conter no mínimo 3 caracteres.' });
       return;
     }
     if (newPinInput !== confirmPinInput) {
       setPinChangeMsg({ type: 'error', text: 'A confirmação da nova senha não coincide.' });
       return;
     }
-    const success = changeDirigentePin(currentPinInput || activePinValue || '1234', newPinInput);
+    const success = changeDirigentePin(currentPinInput.trim() || activePinValue, newPinInput.trim());
     if (success) {
-      setPinChangeMsg({ type: 'success', text: `Senha / PIN do Dirigente atualizada com sucesso para todos os acessos!` });
+      setPinChangeMsg({ type: 'success', text: `Senha / PIN do Dirigente atualizada com sucesso no servidor!` });
       setCurrentPinInput('');
       setNewPinInput('');
       setConfirmPinInput('');
     } else {
-      setPinChangeMsg({ type: 'error', text: 'Não foi possível alterar. Verifique os dados e tente novamente.' });
+      setPinChangeMsg({ type: 'error', text: 'Senha atual incorreta. A alteração foi rejeitada por segurança.' });
     }
     setTimeout(() => setPinChangeMsg(null), 5000);
   };
@@ -126,54 +143,427 @@ export const AdminSettingsView: React.FC = () => {
   return (
     <div id="admin-settings-view" className="space-y-8 animate-fadeIn">
       {/* Top Header */}
-      <div className="border-b border-[#292E36] pb-4">
-        <div className="flex items-center gap-2">
-          <Settings className="w-6 h-6 text-[#C9B27C]" />
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F2F2F2]">
-            Administração & Configurações da Vigília
-          </h1>
+      <div className="border-b border-[#292E36] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Settings className="w-6 h-6 text-[#C9B27C]" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F2F2F2]">
+              Administração & Configurações da Vigília
+            </h1>
+          </div>
+          <p className="text-xs sm:text-sm text-[#9FA4AD] mt-1">
+            Personalize as informações da vigília, monitore o servidor, bancos de dados, backups e segurança.
+          </p>
         </div>
-        <p className="text-xs sm:text-sm text-[#9FA4AD] mt-1">
-          Personalize as informações gerais da vigília, tema, versículo, escalas e faça backup dos dados.
-        </p>
+
+        {/* Section Tabs */}
+        <div className="flex items-center gap-1.5 p-1 bg-[#14171C] border border-[#292E36] rounded-xl self-start sm:self-auto overflow-x-auto max-w-full">
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('identidade')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeSectionTab === 'identidade'
+                ? 'bg-[#C9B27C] text-[#0B0D10] shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2]'
+            }`}
+          >
+            <Church className="w-3.5 h-3.5" />
+            <span>Identidade & Tela Inicial</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('geral')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeSectionTab === 'geral'
+                ? 'bg-[#C9B27C] text-[#0B0D10] shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2]'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Liturgia & Geral</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('seguranca')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeSectionTab === 'seguranca'
+                ? 'bg-[#C9B27C] text-[#0B0D10] shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2]'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Segurança & Senhas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab('servidor')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeSectionTab === 'servidor'
+                ? 'bg-[#C9B27C] text-[#0B0D10] shadow-md'
+                : 'text-[#9FA4AD] hover:text-[#F2F2F2]'
+            }`}
+          >
+            <Server className="w-3.5 h-3.5" />
+            <span>Servidor & Banco Central</span>
+          </button>
+        </div>
       </div>
 
-      {/* DASHBOARD STATS OVERVIEW */}
-      <div>
-        <h2 className="text-xs font-mono uppercase text-[#9FA4AD] tracking-wider mb-3">
-          Resumo Geral da Programação
-        </h2>
+      {/* IDENTIDADE & TELA INICIAL TAB */}
+      {activeSectionTab === 'identidade' && (
+        <div className="space-y-8 animate-fadeIn">
+          {/* Banner Overview */}
+          <div className="p-6 rounded-2xl bg-[#14171C] border border-[#292E36] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#C9B27C]/10 text-[#C9B27C] text-xs font-semibold">
+                <Church className="w-3.5 h-3.5" />
+                <span>Personalização da Entrada de Dirigentes e Membros</span>
+              </div>
+              <h2 className="text-xl font-bold text-[#F2F2F2]">
+                Identidade da Igreja, Nome da Vigília e Local
+              </h2>
+              <p className="text-xs text-[#9FA4AD] max-w-xl">
+                Altere aqui o nome da igreja, o nome da vigília, o local de realização, data/horário e mensagens. As alterações são sincronizadas para todos os participantes em tempo real e salvas no banco de dados.
+              </p>
+            </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
-            <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Atividades</span>
-            <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
-              {moments.length}
-            </span>
+            {saveSuccess && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-950/80 text-emerald-300 text-xs font-bold border border-emerald-500/40 shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Salvo e Sincronizado para Todos!</span>
+              </div>
+            )}
           </div>
 
-          <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
-            <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Equipes</span>
-            <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
-              {teams.length}
-            </span>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: Edit Form (7 cols) */}
+            <div className="lg:col-span-7 space-y-6">
+              <form onSubmit={handleSubmit} className="p-6 rounded-2xl bg-[#14171C] border border-[#292E36] space-y-5">
+                <h3 className="text-sm font-bold text-[#F2F2F2] flex items-center gap-2 border-b border-[#292E36] pb-3">
+                  <LayoutTemplate className="w-4 h-4 text-[#C9B27C]" />
+                  <span>Dados de Exibição Pública</span>
+                </h3>
 
-          <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
-            <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Participantes</span>
-            <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
-              {participants.length}
-            </span>
-          </div>
+                {/* 1. Nome da Igreja */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5 flex items-center gap-1.5">
+                    <Church className="w-3.5 h-3.5 text-[#C9B27C]" />
+                    <span>Nome da Igreja / Ministério / Congregação *</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.churchName || ''}
+                    onChange={(e) => setFormData({ ...formData, churchName: e.target.value })}
+                    placeholder="Ex: Igreja Central, Igreja Adventista do Sétimo Dia..."
+                    className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-3 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                  />
+                  <p className="text-[11px] text-[#9FA4AD]/70 mt-1">
+                    Aparece no badge superior na tela de login de todos os celulares e computadores.
+                  </p>
+                </div>
 
-          <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
-            <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Pedidos de Oração</span>
-            <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
-              {prayerRequests.length}
-            </span>
+                {/* 2. Nome da Vigília */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5 flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5 text-[#C9B27C]" />
+                    <span>Nome da Vigília *</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.vigilName || ''}
+                    onChange={(e) => setFormData({ ...formData, vigilName: e.target.value })}
+                    placeholder="Ex: Grande Vigília de Oração e Louvor, Noite do Clamor..."
+                    className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-3 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition font-semibold"
+                  />
+                  <p className="text-[11px] text-[#9FA4AD]/70 mt-1">
+                    Título principal da tela de login e cabeçalho do cronograma.
+                  </p>
+                </div>
+
+                {/* 3. Local e Endereço */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#C9B27C]" />
+                      <span>Local da Vigília *</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.location || ''}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="Ex: Templo Central / Auditório Principal"
+                      className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
+                      Cidade e Estado (UF)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city || ''}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="Ex: São Paulo - SP"
+                      className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço detalhado */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
+                    Endereço Completo (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address || ''}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Ex: Av. das Nações Unidas, 1200 - Bairro Central"
+                    className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                  />
+                </div>
+
+                {/* 4. Tema e Versículo */}
+                <div className="space-y-4 pt-2 border-t border-[#292E36]/60">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#C9B27C]" />
+                      <span>Tema Espiritual da Vigília</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.theme || ''}
+                      onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
+                      placeholder="Ex: Uma noite de busca espiritual, cura e avivamento"
+                      className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5 flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-[#C9B27C]" />
+                        <span>Versículo Chave</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.keyVerse || ''}
+                        onChange={(e) => setFormData({ ...formData, keyVerse: e.target.value })}
+                        placeholder="Ex: Clama a mim, e responder-te-ei..."
+                        className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
+                        Referência
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.verseReference || ''}
+                        onChange={(e) => setFormData({ ...formData, verseReference: e.target.value })}
+                        placeholder="Ex: Jeremias 33:3"
+                        className="w-full bg-[#0B0D10] text-[#F2F2F2] px-4 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Data e Horários */}
+                <div className="space-y-3 pt-2 border-t border-[#292E36]/60">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#F2F2F2] flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-[#C9B27C]" />
+                      <span>Data e Horário</span>
+                    </span>
+                    <span className="text-[11px] font-mono text-[#C9B27C] bg-[#0B0D10] px-2.5 py-1 rounded border border-[#292E36]">
+                      Duração: {calculateVigilDurationHours(formData.startTime, formData.endTime)}h
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-[#9FA4AD] mb-1">Data *</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.date || ''}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs font-mono focus:border-[#C9B27C] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-[#9FA4AD] mb-1">Início *</label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.startTime || '21:00'}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs font-mono focus:border-[#C9B27C] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-[#9FA4AD] mb-1">Término *</label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.endTime || '05:00'}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs font-mono focus:border-[#C9B27C] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-4 border-t border-[#292E36] flex items-center justify-between">
+                  <span className="text-xs text-[#9FA4AD]">
+                    Salva diretamente no banco de dados central
+                  </span>
+
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-extrabold text-sm transition shadow-lg shadow-[#C9B27C]/10 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Salvar Alterações</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Right Column: Live Mockup / Preview (5 cols) */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36] space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-[#C9B27C] uppercase tracking-wider flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Pré-Visualização da Tela Inicial</span>
+                  </h3>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+                    Ao Vivo
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#9FA4AD]">
+                  Veja como os participantes e dirigentes verão a tela inicial nos celulares e computadores:
+                </p>
+              </div>
+
+              {/* Mockup Frame */}
+              <div className="rounded-3xl bg-[#0B0D10] border-2 border-[#292E36] p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
+                <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-48 bg-[#C9B27C]/10 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Church Pill */}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#14171C] border border-[#C9B27C]/30 text-[#C9B27C] text-[11px] font-semibold">
+                  <Church className="w-3 h-3" />
+                  <span>{formData.churchName || 'Nome da Igreja'}</span>
+                </div>
+
+                {/* Vigil Title */}
+                <h4 className="text-lg sm:text-xl font-bold font-serif text-[#F2F2F2] leading-tight">
+                  {formData.vigilName || 'Nome da Vigília'}
+                </h4>
+
+                {/* Theme */}
+                {formData.theme && (
+                  <p className="text-xs text-[#C9B27C] italic">
+                    "{formData.theme}"
+                  </p>
+                )}
+
+                {/* Meta badges */}
+                <div className="flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-[#9FA4AD]">
+                  {formData.location && (
+                    <span className="px-2 py-1 rounded-lg bg-[#14171C] border border-[#292E36] text-[#F2F2F2]">
+                      📍 {formData.location} {formData.city ? `(${formData.city})` : ''}
+                    </span>
+                  )}
+                  {formData.date && (
+                    <span className="px-2 py-1 rounded-lg bg-[#14171C] border border-[#292E36] text-[#F2F2F2]">
+                      📅 {formData.date}
+                    </span>
+                  )}
+                  {formData.startTime && (
+                    <span className="px-2 py-1 rounded-lg bg-[#14171C] border border-[#292E36] text-[#C9B27C] font-mono">
+                      ⏰ {formData.startTime} - {formData.endTime || '05:00'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Mini Mockup Buttons */}
+                <div className="grid grid-cols-2 gap-2 pt-2 text-[10px] font-bold">
+                  <div className="p-2.5 rounded-xl bg-[#C9B27C] text-[#0B0D10] flex items-center justify-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>DIRIGENTE</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#14171C] border border-[#292E36] text-[#F2F2F2] flex items-center justify-center gap-1">
+                    <Users className="w-3 h-3 text-[#C9B27C]" />
+                    <span>PARTICIPANTE</span>
+                  </div>
+                </div>
+
+                <p className="text-[9px] text-[#9FA4AD]/50 pt-2 border-t border-[#292E36]/40">
+                  {formData.churchName || 'Igreja'} • Plataforma de Gestão de Vigílias
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* SERVER & DATABASE TAB */}
+      {activeSectionTab === 'servidor' && (
+        <ServerMonitoringSection />
+      )}
+
+      {/* GENERAL LITURGY TAB */}
+      {activeSectionTab === 'geral' && (
+        <div className="space-y-6">
+          {/* DASHBOARD STATS OVERVIEW */}
+          <div>
+            <h2 className="text-xs font-mono uppercase text-[#9FA4AD] tracking-wider mb-3">
+              Resumo Geral da Programação
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
+                <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Atividades</span>
+                <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
+                  {moments.length}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
+                <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Equipes</span>
+                <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
+                  {teams.length}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
+                <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Participantes</span>
+                <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
+                  {participants.length}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#14171C] border border-[#292E36]">
+                <span className="text-[11px] text-[#9FA4AD] font-mono uppercase block">Pedidos de Oração</span>
+                <span className="text-xl sm:text-2xl font-bold text-[#F2F2F2] mt-1 block">
+                  {prayerRequests.length}
+                </span>
+              </div>
+            </div>
+          </div>
 
       {/* MAIN CONFIGURATION FORM */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[#14171C] border border-[#292E36] space-y-6">
@@ -202,7 +592,7 @@ export const AdminSettingsView: React.FC = () => {
               <input
                 type="text"
                 required
-                value={formData.vigilName}
+                value={formData.vigilName || ''}
                 onChange={(e) => setFormData({ ...formData, vigilName: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -215,7 +605,7 @@ export const AdminSettingsView: React.FC = () => {
               <input
                 type="text"
                 required
-                value={formData.churchName}
+                value={formData.churchName || ''}
                 onChange={(e) => setFormData({ ...formData, churchName: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -229,7 +619,7 @@ export const AdminSettingsView: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={formData.theme}
+                value={formData.theme || ''}
                 onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -333,7 +723,7 @@ export const AdminSettingsView: React.FC = () => {
                 <input
                   type="date"
                   required
-                  value={formData.date}
+                  value={formData.date || ''}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   className="w-full bg-[#14171C] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-xs sm:text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -346,7 +736,7 @@ export const AdminSettingsView: React.FC = () => {
                 <input
                   type="time"
                   required
-                  value={formData.startTime}
+                  value={formData.startTime || ''}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                   className="w-full bg-[#14171C] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-xs sm:text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -359,7 +749,7 @@ export const AdminSettingsView: React.FC = () => {
                 <input
                   type="time"
                   required
-                  value={formData.endTime}
+                  value={formData.endTime || ''}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                   className="w-full bg-[#14171C] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-xs sm:text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -470,7 +860,7 @@ export const AdminSettingsView: React.FC = () => {
               <input
                 type="text"
                 required
-                value={formData.location}
+                value={formData.location || ''}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -480,7 +870,7 @@ export const AdminSettingsView: React.FC = () => {
               <label className="block text-xs font-medium text-[#9FA4AD] mb-1">Cidade</label>
               <input
                 type="text"
-                value={formData.city}
+                value={formData.city || ''}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -494,7 +884,7 @@ export const AdminSettingsView: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={formData.keyVerse}
+                value={formData.keyVerse || ''}
                 onChange={(e) => setFormData({ ...formData, keyVerse: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -507,7 +897,7 @@ export const AdminSettingsView: React.FC = () => {
               <input
                 type="text"
                 placeholder="Ex: Jeremias 33:3"
-                value={formData.verseReference}
+                value={formData.verseReference || ''}
                 onChange={(e) => setFormData({ ...formData, verseReference: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
               />
@@ -520,7 +910,7 @@ export const AdminSettingsView: React.FC = () => {
             </label>
             <textarea
               rows={3}
-              value={formData.description}
+              value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none resize-none"
             />
@@ -575,7 +965,7 @@ export const AdminSettingsView: React.FC = () => {
             </label>
             <input
               type="text"
-              value={formData.additionalInfo}
+              value={formData.additionalInfo || ''}
               onChange={(e) => setFormData({ ...formData, additionalInfo: e.target.value })}
               className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
             />
@@ -592,160 +982,181 @@ export const AdminSettingsView: React.FC = () => {
           </div>
         </form>
       </div>
+    </div>
+    )}
 
-      {/* SECURITY & DIRIGENTE PIN MANAGEMENT */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-[#14171C] border border-[#292E36] space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#292E36] pb-4 gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0B0D10] border border-[#C9B27C]/40 flex items-center justify-center text-[#C9B27C] shrink-0">
-              <Key className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-[#F2F2F2]">
-                Segurança & Senha / PIN dos Dirigentes
-              </h2>
-              <p className="text-xs text-[#9FA4AD]">
-                Esta senha impede o acesso de participantes aos controles de moderação e edição. Ao sair para o modo participante, o aplicativo sempre exigirá esta senha para reentrar.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={lockDirigenteMode}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0B0D10] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-300 text-xs font-semibold border border-[#292E36] transition shrink-0"
-            title="Bloquear agora e alternar para a visão de participante"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Sair / Bloquear Agora</span>
-          </button>
-        </div>
-
-        {/* Current Active Password Viewer Card */}
-        <div className="p-4 rounded-xl bg-[#0B0D10] border border-[#292E36] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-[#C9B27C]" />
-            <div>
-              <p className="text-xs font-semibold text-[#F2F2F2]">Senha / PIN Atual Configurado</p>
-              <p className="text-[11px] text-[#9FA4AD]">Utilize esta senha ao fazer login como Dirigente</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="px-3.5 py-1.5 bg-[#14171C] border border-[#292E36] rounded-xl font-mono text-sm font-bold text-[#C9B27C] tracking-wider min-w-[100px] text-center">
-              {showActivePin ? activePinValue : '••••••••'}
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowActivePin(!showActivePin)}
-              className="p-2 rounded-xl bg-[#14171C] hover:bg-[#191D23] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] transition"
-              title={showActivePin ? 'Ocultar Senha' : 'Ver Senha Atual'}
-            >
-              {showActivePin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-
-        {pinChangeMsg && (
-          <div
-            className={`p-3.5 rounded-xl border text-xs font-medium flex items-center gap-2 ${
-              pinChangeMsg.type === 'success'
-                ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
-                : 'bg-rose-950/40 border-rose-800/60 text-rose-300'
-            }`}
-          >
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{pinChangeMsg.text}</span>
-          </div>
-        )}
-
-        {/* Change Password Form */}
-        <form onSubmit={handlePinSubmit} className="space-y-3">
-          <p className="text-xs font-semibold text-[#F2F2F2]">Alterar Senha do Dirigente:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
-                Nova Senha / PIN *
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={20}
-                placeholder="Digite a nova senha desejada"
-                value={newPinInput}
-                onChange={(e) => setNewPinInput(e.target.value)}
-                className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
-              />
+      {/* SECURITY TAB */}
+      {activeSectionTab === 'seguranca' && (
+        <div className="space-y-6">
+          {/* SECURITY & DIRIGENTE PIN MANAGEMENT */}
+          <div className="p-6 sm:p-8 rounded-2xl bg-[#14171C] border border-[#292E36] space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#292E36] pb-4 gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0B0D10] border border-[#C9B27C]/40 flex items-center justify-center text-[#C9B27C] shrink-0">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-[#F2F2F2]">
+                    Segurança & Senha / PIN dos Dirigentes
+                  </h2>
+                  <p className="text-xs text-[#9FA4AD]">
+                    Esta senha impede o acesso de participantes aos controles de moderação e edição. Ao sair para o modo participante, o aplicativo sempre exigirá esta senha para reentrar.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={lockDirigenteMode}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0B0D10] hover:bg-rose-950/40 text-[#9FA4AD] hover:text-rose-300 text-xs font-semibold border border-[#292E36] transition shrink-0"
+                title="Bloquear agora e alternar para a visão de participante"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Sair / Bloquear Agora</span>
+              </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
-                Confirmar Nova Senha *
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  required
-                  maxLength={20}
-                  placeholder="Repita a nova senha"
-                  value={confirmPinInput}
-                  onChange={(e) => setConfirmPinInput(e.target.value)}
-                  className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
-                />
+            {/* Current Active Password Viewer Card */}
+            <div className="p-4 rounded-xl bg-[#0B0D10] border border-[#292E36] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-[#C9B27C]" />
+                <div>
+                  <p className="text-xs font-semibold text-[#F2F2F2]">Senha / PIN Atual Configurado</p>
+                  <p className="text-[11px] text-[#9FA4AD]">Utilize esta senha ao fazer login como Dirigente</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="px-3.5 py-1.5 bg-[#14171C] border border-[#292E36] rounded-xl font-mono text-sm font-bold text-[#C9B27C] tracking-wider min-w-[100px] text-center">
+                  {showActivePin ? activePinValue : '••••••••'}
+                </div>
                 <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-bold text-xs rounded-xl shrink-0 transition shadow-md"
+                  type="button"
+                  onClick={() => setShowActivePin(!showActivePin)}
+                  className="p-2 rounded-xl bg-[#14171C] hover:bg-[#191D23] text-[#9FA4AD] hover:text-[#F2F2F2] border border-[#292E36] transition"
+                  title={showActivePin ? 'Ocultar Senha' : 'Ver Senha Atual'}
                 >
-                  Salvar Senha
+                  {showActivePin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
+
+            {pinChangeMsg && (
+              <div
+                className={`p-3.5 rounded-xl border text-xs font-medium flex items-center gap-2 ${
+                  pinChangeMsg.type === 'success'
+                    ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
+                    : 'bg-rose-950/40 border-rose-800/60 text-rose-300'
+                }`}
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{pinChangeMsg.text}</span>
+              </div>
+            )}
+
+            {/* Change Password Form */}
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <p className="text-xs font-semibold text-[#F2F2F2]">Alterar Senha do Dirigente:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
+                    Senha / PIN Atual *
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={30}
+                    placeholder="Senha atual..."
+                    value={currentPinInput}
+                    onChange={(e) => setCurrentPinInput(e.target.value)}
+                    className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
+                    Nova Senha / PIN *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    maxLength={30}
+                    placeholder="Nova senha..."
+                    value={newPinInput}
+                    onChange={(e) => setNewPinInput(e.target.value)}
+                    className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#9FA4AD] mb-1.5">
+                    Confirmar Nova Senha *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      required
+                      maxLength={30}
+                      placeholder="Repita a nova senha..."
+                      value={confirmPinInput}
+                      onChange={(e) => setConfirmPinInput(e.target.value)}
+                      className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-[#C9B27C] hover:bg-[#bfa872] text-[#0B0D10] font-bold text-xs rounded-xl shrink-0 transition shadow-md cursor-pointer"
+                    >
+                      Salvar Senha
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
 
-      {/* BACKUP & DATA MANAGEMENT */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-[#14171C] border border-[#292E36] space-y-4">
-        <h2 className="text-base sm:text-lg font-bold text-[#F2F2F2]">
-          Gerenciamento de Dados & Backup
-        </h2>
-        <p className="text-xs text-[#9FA4AD]">
-          Você pode exportar a estrutura da vigília em arquivo JSON para usar em outros computadores ou restaurar caso precise.
-        </p>
+          {/* BACKUP & DATA MANAGEMENT */}
+          <div className="p-6 sm:p-8 rounded-2xl bg-[#14171C] border border-[#292E36] space-y-4">
+            <h2 className="text-base sm:text-lg font-bold text-[#F2F2F2]">
+              Gerenciamento de Dados & Exportação JSON
+            </h2>
+            <p className="text-xs text-[#9FA4AD]">
+              Você pode exportar a estrutura da vigília em arquivo JSON para usar em outros computadores ou restaurar caso precise.
+            </p>
 
-        {importStatus && (
-          <div className="p-3 rounded-lg bg-[#191D23] border border-[#292E36] text-xs text-[#C9B27C]">
-            {importStatus}
+            {importStatus && (
+              <div className="p-3 rounded-lg bg-[#191D23] border border-[#292E36] text-xs text-[#C9B27C]">
+                {importStatus}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#191D23] hover:bg-[#292E36] text-[#F2F2F2] text-xs font-semibold border border-[#292E36] transition"
+              >
+                <Download className="w-4 h-4 text-[#C9B27C]" />
+                <span>Exportar Backup (JSON)</span>
+              </button>
+
+              <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#191D23] hover:bg-[#292E36] text-[#F2F2F2] text-xs font-semibold border border-[#292E36] cursor-pointer transition">
+                <Upload className="w-4 h-4 text-[#C9B27C]" />
+                <span>Importar Backup (JSON)</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportFile}
+                  className="hidden"
+                />
+              </label>
+
+              <button
+                onClick={resetToDefaultData}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-950/80 text-rose-300 text-xs font-semibold border border-rose-800/40 transition"
+              >
+                <RotateCcw className="w-4 h-4 text-rose-400" />
+                <span>Restaurar Dados Padrões</span>
+              </button>
+            </div>
           </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#191D23] hover:bg-[#292E36] text-[#F2F2F2] text-xs font-semibold border border-[#292E36] transition"
-          >
-            <Download className="w-4 h-4 text-[#C9B27C]" />
-            <span>Exportar Backup (JSON)</span>
-          </button>
-
-          <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#191D23] hover:bg-[#292E36] text-[#F2F2F2] text-xs font-semibold border border-[#292E36] cursor-pointer transition">
-            <Upload className="w-4 h-4 text-[#C9B27C]" />
-            <span>Importar Backup (JSON)</span>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportFile}
-              className="hidden"
-            />
-          </label>
-
-          <button
-            onClick={resetToDefaultData}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-950/80 text-rose-300 text-xs font-semibold border border-rose-800/40 transition"
-          >
-            <RotateCcw className="w-4 h-4 text-rose-400" />
-            <span>Restaurar Dados Padrões</span>
-          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 };

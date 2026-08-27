@@ -532,7 +532,7 @@ export const ScheduleView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: Abertura & Louvor Congregacional"
-                  value={formData.title}
+                  value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -544,7 +544,7 @@ export const ScheduleView: React.FC = () => {
                   <input
                     type="time"
                     required
-                    value={formData.startTime}
+                    value={formData.startTime || ''}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-2.5 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -554,7 +554,7 @@ export const ScheduleView: React.FC = () => {
                   <input
                     type="time"
                     required
-                    value={formData.endTime}
+                    value={formData.endTime || ''}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-2.5 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -562,7 +562,7 @@ export const ScheduleView: React.FC = () => {
                 <div>
                   <label className="block font-medium text-[#9FA4AD] mb-1">Tipo</label>
                   <select
-                    value={formData.type}
+                    value={formData.type || 'louvor'}
                     onChange={(e) =>
                       setFormData({ ...formData, type: e.target.value as MomentType })
                     }
@@ -582,7 +582,7 @@ export const ScheduleView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Pr. Marcos, Equipe de Louvor, Ministério Jovem..."
-                  value={formData.responsible}
+                  value={formData.responsible || ''}
                   onChange={(e) => setFormData({ ...formData, responsible: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -593,7 +593,7 @@ export const ScheduleView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Salmos 119:105, Efésios 6:10-18"
-                  value={formData.scripture}
+                  value={formData.scripture || ''}
                   onChange={(e) => setFormData({ ...formData, scripture: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -604,7 +604,7 @@ export const ScheduleView: React.FC = () => {
                 <textarea
                   rows={2}
                   placeholder="Instruções gerais visíveis a todos os participantes..."
-                  value={formData.description}
+                  value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none resize-none"
                 />

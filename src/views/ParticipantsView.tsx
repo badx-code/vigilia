@@ -346,7 +346,7 @@ export const ParticipantsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Seu nome e sobrenome"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -389,7 +389,7 @@ export const ParticipantsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="(00) 90000-0000"
-                  value={formData.phone}
+                  value={formData.phone || ''}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -402,7 +402,7 @@ export const ParticipantsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Comunidade Local, Igreja Convidada..."
-                  value={formData.church}
+                  value={formData.church || ''}
                   onChange={(e) => setFormData({ ...formData, church: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -413,7 +413,7 @@ export const ParticipantsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Sua cidade"
-                  value={formData.city}
+                  value={formData.city || ''}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />

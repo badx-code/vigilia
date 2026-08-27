@@ -760,7 +760,7 @@ export const TeamsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: Intercessão, Fotografia, Estacionamento..."
-                  value={teamForm.name}
+                  value={teamForm.name || ''}
                   onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -769,7 +769,7 @@ export const TeamsView: React.FC = () => {
               <div>
                 <label className="block text-xs font-medium text-[#9FA4AD] mb-1">Ícone</label>
                 <select
-                  value={teamForm.icon}
+                  value={teamForm.icon || 'Users'}
                   onChange={(e) => setTeamForm({ ...teamForm, icon: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 >
@@ -788,7 +788,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Nome do líder da equipe"
-                  value={teamForm.leader}
+                  value={teamForm.leader || ''}
                   onChange={(e) => setTeamForm({ ...teamForm, leader: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -801,7 +801,7 @@ export const TeamsView: React.FC = () => {
                 <textarea
                   rows={2}
                   placeholder="O que esta equipe realiza durante a vigília..."
-                  value={teamForm.description}
+                  value={teamForm.description || ''}
                   onChange={(e) => setTeamForm({ ...teamForm, description: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none resize-none"
                 />
@@ -845,7 +845,7 @@ export const TeamsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Nome do integrante"
-                  value={memberForm.name}
+                  value={memberForm.name || ''}
                   onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -856,7 +856,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Teclado, Recepção de Jovens, Plantão..."
-                  value={memberForm.role}
+                  value={memberForm.role || ''}
                   onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -867,7 +867,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="(00) 90000-0000"
-                  value={memberForm.phone}
+                  value={memberForm.phone || ''}
                   onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -911,7 +911,7 @@ export const TeamsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: Porque Ele Vive, Tu És Fiel..."
-                  value={songForm.title}
+                  value={songForm.title || ''}
                   onChange={(e) => setSongForm({ ...songForm, title: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -923,7 +923,7 @@ export const TeamsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Ex: G, Em, C..."
-                    value={songForm.key}
+                    value={songForm.key || ''}
                     onChange={(e) => setSongForm({ ...songForm, key: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -933,7 +933,7 @@ export const TeamsView: React.FC = () => {
                   <label className="block text-xs text-[#9FA4AD] mb-1">Horário Previsto</label>
                   <input
                     type="time"
-                    value={songForm.time}
+                    value={songForm.time || ''}
                     onChange={(e) => setSongForm({ ...songForm, time: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs font-mono focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -945,7 +945,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Hino Tradicional, Adoração..."
-                  value={songForm.artist}
+                  value={songForm.artist || ''}
                   onChange={(e) => setSongForm({ ...songForm, artist: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -956,7 +956,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Entrada com violão suave..."
-                  value={songForm.notes}
+                  value={songForm.notes || ''}
                   onChange={(e) => setSongForm({ ...songForm, notes: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -1000,7 +1000,7 @@ export const TeamsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Nome do preletor"
-                  value={sermonForm.preacher}
+                  value={sermonForm.preacher || ''}
                   onChange={(e) => setSermonForm({ ...sermonForm, preacher: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -1011,7 +1011,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: A Oração que Move os Céus..."
-                  value={sermonForm.theme}
+                  value={sermonForm.theme || ''}
                   onChange={(e) => setSermonForm({ ...sermonForm, theme: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -1023,7 +1023,7 @@ export const TeamsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Ex: Jeremias 33:3"
-                    value={sermonForm.scripture}
+                    value={sermonForm.scripture || ''}
                     onChange={(e) => setSermonForm({ ...sermonForm, scripture: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -1034,7 +1034,7 @@ export const TeamsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="21:20 - 21:50"
-                    value={sermonForm.time}
+                    value={sermonForm.time || ''}
                     onChange={(e) => setSermonForm({ ...sermonForm, time: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -1076,7 +1076,7 @@ export const TeamsView: React.FC = () => {
               <div>
                 <label className="block text-xs text-[#9FA4AD] mb-1">Área da Mídia</label>
                 <select
-                  value={mediaForm.area}
+                  value={mediaForm.area || 'Fotografia'}
                   onChange={(e) => setMediaForm({ ...mediaForm, area: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 >
@@ -1095,7 +1095,7 @@ export const TeamsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Nome do integrante"
-                  value={mediaForm.person}
+                  value={mediaForm.person || ''}
                   onChange={(e) => setMediaForm({ ...mediaForm, person: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -1106,7 +1106,7 @@ export const TeamsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Câmera fixa no púlpito..."
-                  value={mediaForm.notes}
+                  value={mediaForm.notes || ''}
                   onChange={(e) => setMediaForm({ ...mediaForm, notes: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                 />

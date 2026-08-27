@@ -46,12 +46,19 @@ export const MemberView: React.FC<{
     notices,
     currentTime,
     ministers,
+    activeVigilRequiresParticipantPassword,
+    isParticipantUnlocked,
+    unlockParticipantMode,
   } = useVigilia();
 
   const [activeTab, setActiveTab] = useState<'agora' | 'minha_escala' | 'programacao' | 'repertorio' | 'oracoes' | 'avisos'>('agora');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMemberName, setSelectedMemberName] = useState<string>('');
   const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
+
+  // Participant Password Gateway state
+  const [enteredPassword, setEnteredPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   // Seconds clock for ultra-smooth countdowns in active view
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
@@ -219,6 +226,89 @@ export const MemberView: React.FC<{
         return '✨';
     }
   };
+
+  const handleUnlockParticipant = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!enteredPassword.trim()) {
+      setPasswordError('Digite a senha de acesso.');
+      return;
+    }
+    const success = unlockParticipantMode(enteredPassword.trim());
+    if (success) {
+      setPasswordError('');
+      setEnteredPassword('');
+    } else {
+      setPasswordError('Senha incorreta. Solicite a senha correta ao dirigente.');
+    }
+  };
+
+  if (activeVigilRequiresParticipantPassword && !isParticipantUnlocked) {
+    return (
+      <div id="participant-lock-screen" className="min-h-screen bg-[#0B0D10] text-[#F2F2F2] flex flex-col justify-center items-center px-4 font-sans selection:bg-[#C9B27C]/30">
+        <div className="w-full max-w-md bg-[#14171C] border border-[#292E36] rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[#191D24] border border-[#C9B27C]/30 text-[#C9B27C] flex items-center justify-center mx-auto shadow-inner">
+            <Key className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0B0D10] border border-[#C9B27C]/30 text-[#C9B27C] text-xs font-semibold uppercase tracking-wider">
+              <Church className="w-3.5 h-3.5" />
+              <span>{config.churchName || 'Igreja Local'}</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold font-serif text-[#F2F2F2]">
+              {config.vigilName || 'Vigília de Oração'}
+            </h1>
+            <p className="text-xs text-[#9FA4AD]">
+              Esta vigília é protegida por senha para participantes. Insira a senha definida pela liderança para prosseguir.
+            </p>
+          </div>
+
+          <form onSubmit={handleUnlockParticipant} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-semibold text-[#9FA4AD] uppercase tracking-wider mb-1.5">
+                Senha de Participantes
+              </label>
+              <input
+                type="password"
+                value={enteredPassword}
+                onChange={(e) => {
+                  setEnteredPassword(e.target.value);
+                  if (passwordError) setPasswordError('');
+                }}
+                placeholder="Digite a senha..."
+                className="w-full bg-[#0B0D10] border border-[#292E36] focus:border-[#C9B27C] rounded-xl px-4 py-3 text-sm text-[#F2F2F2] outline-none transition placeholder-[#555B66]"
+                autoFocus
+              />
+              {passwordError && (
+                <p className="text-rose-400 text-xs mt-1.5 font-medium">{passwordError}</p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-[#C9B27C] to-[#E2D2A4] text-[#0B0D10] font-bold text-sm hover:opacity-90 transition shadow-lg flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Entrar na Programação
+            </button>
+          </form>
+
+          {onLogout && (
+            <div className="pt-2 border-t border-[#292E36]/60">
+              <button
+                type="button"
+                onClick={onLogout}
+                className="text-xs text-[#9FA4AD] hover:text-[#F2F2F2] transition flex items-center justify-center gap-1.5 mx-auto"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Voltar à tela inicial
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="member-root" className="min-h-screen bg-[#0B0D10] text-[#F2F2F2] pb-24 font-sans selection:bg-[#C9B27C]/30">
@@ -488,6 +578,34 @@ export const MemberView: React.FC<{
                   )}
                   <p className="text-[11px] text-[#9FA4AD]">
                     Duração: {formatDurationHuman(calculateDurationMinutes(nextMoment.startTime, nextMoment.endTime, config.startTime))}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Dirigente Pastoral Note & Welcome */}
+            {config.dirigenteProfile?.bio && (
+              <div className="rounded-2xl bg-[#14171C] border border-[#292E36] p-4 flex items-start gap-3 shadow-md">
+                <div className="w-10 h-10 rounded-full bg-[#0B0D10] border border-[#C9B27C]/40 flex items-center justify-center text-[#C9B27C] font-bold text-xs shrink-0 overflow-hidden">
+                  {config.dirigenteProfile?.photoUrl ? (
+                    <img src={config.dirigenteProfile.photoUrl} alt="Dirigente" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>👑</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-[#F2F2F2]">
+                      {config.dirigenteProfile?.fullName || config.dirigenteProfile?.displayName || 'Palavra do Dirigente'}
+                    </h4>
+                    {config.dirigenteProfile?.roleTitle && (
+                      <span className="text-[10px] text-[#C9B27C] font-semibold bg-[#0B0D10] px-1.5 py-0.2 rounded border border-[#292E36]">
+                        {config.dirigenteProfile.roleTitle}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#9FA4AD] italic leading-relaxed">
+                    "{config.dirigenteProfile.bio}"
                   </p>
                 </div>
               </div>

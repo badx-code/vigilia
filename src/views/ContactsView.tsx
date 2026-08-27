@@ -179,7 +179,7 @@ export const ContactsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: Coordenação Geral, Som, Recepção, Copa"
-                  value={formData.title}
+                  value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -193,7 +193,7 @@ export const ContactsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Nome do líder ou plantonista"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -207,7 +207,7 @@ export const ContactsView: React.FC = () => {
                   type="text"
                   required
                   placeholder="Ex: (11) 98765-4321"
-                  value={formData.phone}
+                  value={formData.phone || ''}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -220,7 +220,7 @@ export const ContactsView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Ex: Plantão das 23h às 03h, Suporte Técnico..."
-                  value={formData.role}
+                  value={formData.role || ''}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] focus:border-[#C9B27C] focus:outline-none"
                 />

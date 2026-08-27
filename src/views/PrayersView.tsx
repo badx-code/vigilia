@@ -471,7 +471,7 @@ export const PrayersView: React.FC = () => {
                   required
                   rows={3}
                   placeholder="Descreva seu pedido de oração com sinceridade de coração..."
-                  value={formData.request}
+                  value={formData.request || ''}
                   onChange={(e) => setFormData({ ...formData, request: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none resize-none"
                 />
@@ -480,7 +480,7 @@ export const PrayersView: React.FC = () => {
               <div>
                 <label className="block text-xs font-medium text-[#9FA4AD] mb-1">Categoria</label>
                 <select
-                  value={formData.category}
+                  value={formData.category || 'saude'}
                   onChange={(e) =>
                     setFormData({ ...formData, category: e.target.value as PrayerCategory })
                   }
@@ -498,7 +498,7 @@ export const PrayersView: React.FC = () => {
                 <label className="flex items-center gap-2 cursor-pointer pt-0.5">
                   <input
                     type="checkbox"
-                    checked={formData.isAnonymous}
+                    checked={formData.isAnonymous || false}
                     onChange={(e) => setFormData({ ...formData, isAnonymous: e.target.checked })}
                     className="rounded border-[#292E36] bg-[#0B0D10] text-[#C9B27C] focus:ring-0"
                   />
@@ -514,7 +514,7 @@ export const PrayersView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Nome completo ou primeiro nome"
-                    value={formData.authorName}
+                    value={formData.authorName || ''}
                     onChange={(e) => setFormData({ ...formData, authorName: e.target.value })}
                     className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3 py-1.5 rounded-xl border border-[#292E36] text-xs focus:border-[#C9B27C] focus:outline-none"
                   />

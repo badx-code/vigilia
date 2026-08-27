@@ -102,7 +102,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                   type="text"
                   required
                   placeholder="Ex: Grande Vigília Jovem"
-                  value={formData.vigilName}
+                  value={formData.vigilName || ''}
                   onChange={(e) => setFormData({ ...formData, vigilName: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -117,7 +117,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                   type="text"
                   required
                   placeholder="Ex: IASD Central de Fertilidade"
-                  value={formData.churchName}
+                  value={formData.churchName || ''}
                   onChange={(e) => setFormData({ ...formData, churchName: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -134,7 +134,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: O Despertar do Remanescente"
-                  value={formData.theme}
+                  value={formData.theme || ''}
                   onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -240,7 +240,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                   <input
                     type="date"
                     required
-                    value={formData.date}
+                    value={formData.date || ''}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="w-full bg-[#14171C] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs sm:text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -253,7 +253,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                   <input
                     type="time"
                     required
-                    value={formData.startTime}
+                    value={formData.startTime || ''}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                     className="w-full bg-[#14171C] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs sm:text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -266,7 +266,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                   <input
                     type="time"
                     required
-                    value={formData.endTime}
+                    value={formData.endTime || ''}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                     className="w-full bg-[#14171C] text-[#F2F2F2] px-3 py-2 rounded-xl border border-[#292E36] text-xs sm:text-sm font-mono focus:border-[#C9B27C] focus:outline-none"
                   />
@@ -377,7 +377,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                   type="text"
                   required
                   placeholder="Ex: Templo Principal / Rua das Flores, 100"
-                  value={formData.location}
+                  value={formData.location || ''}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -390,7 +390,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: Fertilidade - MG"
-                  value={formData.city}
+                  value={formData.city || ''}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -407,7 +407,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: Clama a mim, e responder-te-ei..."
-                  value={formData.keyVerse}
+                  value={formData.keyVerse || ''}
                   onChange={(e) => setFormData({ ...formData, keyVerse: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -420,7 +420,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: Jeremias 33:3"
-                  value={formData.verseReference}
+                  value={formData.verseReference || ''}
                   onChange={(e) => setFormData({ ...formData, verseReference: e.target.value })}
                   className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none"
                 />
@@ -497,7 +497,7 @@ export const EditVigilDetailsModal: React.FC<EditVigilDetailsModalProps> = ({
               <textarea
                 rows={2}
                 placeholder="Ex: Recomendamos a chegada com 15 minutos de antecedência..."
-                value={formData.additionalInfo}
+                value={formData.additionalInfo || ''}
                 onChange={(e) => setFormData({ ...formData, additionalInfo: e.target.value })}
                 className="w-full bg-[#0B0D10] text-[#F2F2F2] px-3.5 py-2.5 rounded-xl border border-[#292E36] text-sm focus:border-[#C9B27C] focus:outline-none resize-none"
               />
